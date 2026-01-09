@@ -1,696 +1,685 @@
 <!doctype html>
 <html lang="en">
+
 <head>
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>GIS Data Viewer</title>
-  <style>
-    :root{
-      --bg:#0b0f14;
-      --panel:#0f1620;
-      --panel2:#0c121a;
-      --text:#e7edf5;
-      --muted:#9aa7b6;
-      --border:rgba(255,255,255,.08);
-      --border2:rgba(120,170,255,.22);
-      --accent:#6aa6ff;
-      --good:#3ddc97;
-      --warn:#f7c948;
-      --bad:#ff5d5d;
-      --shadow: 0 10px 35px rgba(0,0,0,.45);
-      --radius:18px;
-    }
-    *{box-sizing:border-box}
-    html,body{height:100%}
-    body{
-      margin:0;
-      background: radial-gradient(1200px 600px at 30% -10%, rgba(106,166,255,.18), transparent 60%),
-                  radial-gradient(900px 500px at 80% 10%, rgba(61,220,151,.10), transparent 55%),
-                  var(--bg);
-      color:var(--text);
-      font: 14px/1.35 system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, "Apple Color Emoji","Segoe UI Emoji";
-    }
-    a{color:inherit}
-    .container{
-      max-width: 1300px;
-      margin: 0 auto;
-      padding: 18px 18px 40px;
-    }
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>GIS Data Viewer</title>
+    <style>
+        :root {
+            --bg: #0b0f14;
+            --panel: #0f1620;
+            --text: #e7edf5;
+            --muted: #9aa7b6;
+            --border: rgba(255, 255, 255, .08);
+            --border2: rgba(120, 170, 255, .22);
+            --shadow: 0 10px 35px rgba(0, 0, 0, .45);
+            --radius: 18px;
+        }
 
-    /* Header */
-    .topbar{
-      display:flex;
-      align-items:center;
-      justify-content:space-between;
-      gap:16px;
-      padding: 14px 14px 10px;
-      border-bottom:1px solid var(--border);
-    }
-    .brand{
-      display:flex;
-      align-items:baseline;
-      gap:12px;
-      flex-wrap:wrap;
-    }
-    .brand h1{
-      margin:0;
-      font-size:18px;
-      letter-spacing:.2px;
-      font-weight:700;
-    }
-    .brand .sub{
-      color:var(--muted);
-      font-size:12px;
-      margin-top:2px;
-      white-space:nowrap;
-    }
+        * {
+            box-sizing: border-box
+        }
 
-    /* Controls */
-    .controls{
-      display:grid;
-      grid-template-columns: 1.2fr 1.2fr auto 2.4fr auto;
-      gap:12px;
-      align-items:end;
-      padding: 14px;
-    }
-    @media (max-width: 1050px){
-      .controls{grid-template-columns: 1fr 1fr auto; }
-      .controls .search{grid-column: 1 / -1;}
-      .controls .apply{grid-column: 1 / -1;}
-    }
-    .field label{
-      display:block;
-      color:var(--muted);
-      font-size:12px;
-      margin:0 0 6px 2px;
-    }
-    .field input{
-      width:100%;
-      padding: 11px 12px;
-      border-radius: 12px;
-      border:1px solid var(--border);
-      outline:none;
-      background: linear-gradient(180deg, rgba(255,255,255,.06), rgba(255,255,255,.03));
-      color:var(--text);
-      box-shadow: inset 0 1px 0 rgba(255,255,255,.05);
-    }
-    .field input:focus{
-      border-color: var(--border2);
-      box-shadow: 0 0 0 3px rgba(106,166,255,.12), inset 0 1px 0 rgba(255,255,255,.06);
-    }
-    .btn{
-      padding: 11px 14px;
-      border-radius: 12px;
-      border:1px solid var(--border);
-      background: linear-gradient(180deg, rgba(255,255,255,.06), rgba(255,255,255,.03));
-      color:var(--text);
-      cursor:pointer;
-      font-weight:600;
-      letter-spacing:.2px;
-      box-shadow: var(--shadow);
-    }
-    .btn:hover{border-color: rgba(120,170,255,.35)}
-    .btn.primary{
-      border-color: rgba(106,166,255,.45);
-      box-shadow: 0 0 0 3px rgba(106,166,255,.08), var(--shadow);
-    }
-    .btn.primary:hover{
-      border-color: rgba(106,166,255,.7);
-      box-shadow: 0 0 0 3px rgba(106,166,255,.12), var(--shadow);
-    }
+        html,
+        body {
+            height: 100%
+        }
 
-    /* Summary */
-    .summary{
-      padding: 0 14px 14px;
-      color: var(--muted);
-      border-bottom:1px solid var(--border);
-    }
+        body {
+            margin: 0;
+            background:
+                radial-gradient(1200px 600px at 30% -10%, rgba(106,166,255,.18), transparent 60%),
+                radial-gradient(900px 500px at 80% 10%, rgba(61,220,151,.10), transparent 55%);
+            background-repeat: no-repeat;
+            background-size: 100% 700px;
+            background-color: var(--bg);
+            color: var(--text);
+            font: 14px/1.35 system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial;
+        }
 
-    /* Table cards */
-    .tables{
-      padding: 16px 0 0;
-      display:flex;
-      flex-direction:column;
-      gap:14px;
-    }
-    .table-card{
-      border:1px solid var(--border);
-      border-radius: var(--radius);
-      background: linear-gradient(180deg, rgba(255,255,255,.05), rgba(255,255,255,.025));
-      box-shadow: var(--shadow);
-      overflow: visible; /* IMPORTANT: do not clip table header/body */
-    }
-    .card-head{
-      display:flex;
-      align-items:flex-start;
-      justify-content:space-between;
-      gap:12px;
-      padding: 14px 16px 10px;
-      border-bottom:1px solid var(--border);
-    }
-    .card-title{
-      display:flex;
-      flex-direction:column;
-      gap:4px;
-      min-width: 0;
-    }
-    .card-title .name{
-      font-weight:800;
-      letter-spacing:.2px;
-      font-size:14px;
-      white-space:nowrap;
-      overflow:hidden;
-      text-overflow:ellipsis;
-    }
-    .card-title .meta{
-      font-size:12px;
-      color:var(--muted);
-      white-space:nowrap;
-      overflow:hidden;
-      text-overflow:ellipsis;
-      max-width: 900px;
-    }
-    .pill{
-      flex:0 0 auto;
-      padding: 6px 10px;
-      border-radius: 999px;
-      border:1px solid rgba(106,166,255,.25);
-      color: var(--text);
-      background: rgba(106,166,255,.08);
-      font-size:12px;
-    }
+        .container {
+            max-width: 1300px;
+            margin: 0 auto;
+            padding: 18px 18px 40px
+        }
 
-    /* Scroll wrapper: ONLY thing that scrolls */
-    .table-scroll{
-      overflow:auto;
-      border-radius: 0 0 var(--radius) var(--radius);
-    }
+        .topbar {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 16px;
+            padding: 14px 14px 10px;
+            border-bottom: 1px solid var(--border)
+        }
 
-    /* Table */
-    table{
-      width:100%;
-      border-collapse: separate; /* IMPORTANT: sticky + padding plays nicer */
-      border-spacing: 0;
-      min-width: 920px; /* keeps columns readable; scrolls on small widths */
-    }
-    thead th{
-      position: sticky;
-      top: 0;
-      z-index: 5;
-      text-align:left;
-      padding: 12px 14px;
-      font-size:12px;
-      color: var(--muted);
-      background: rgba(10, 14, 18, 0.92);
-      backdrop-filter: blur(6px);
-      border-bottom:1px solid var(--border);
-    }
-    tbody td{
-      padding: 12px 14px;
-      border-bottom:1px solid rgba(255,255,255,.06);
-      vertical-align: top;
-      line-height: 1.25; /* prevents “clipped first row” look */
-    }
-    tbody tr:hover td{
-      background: rgba(106,166,255,.06);
-    }
-    tbody tr:last-child td{
-      border-bottom: none;
-    }
+        .brand {
+            display: flex;
+            align-items: baseline;
+            gap: 12px;
+            flex-wrap: wrap
+        }
 
-    /* Make the first row never feel tucked */
-    tbody tr:first-child td{
-      padding-top: 14px;
-    }
+        .brand h1 {
+            margin: 0;
+            font-size: 18px;
+            font-weight: 700
+        }
 
-    .muted{color:var(--muted)}
-    .empty{
-      padding: 18px 14px;
-      color: var(--muted);
-      border-top:1px solid var(--border);
-    }
+        .brand .sub {
+            color: var(--muted);
+            font-size: 12px;
+            margin-top: 2px;
+            white-space: nowrap
+        }
 
-    /* Chips */
-    .chip{
-      display:inline-flex;
-      align-items:center;
-      gap:8px;
-      padding: 6px 10px;
-      border-radius: 999px;
-      border:1px solid rgba(255,255,255,.10);
-      background: rgba(255,255,255,.05);
-      color: var(--text);
-      font-size:12px;
-    }
+        .chip {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            padding: 6px 10px;
+            border-radius: 999px;
+            border: 1px solid rgba(255, 255, 255, .10);
+            background: rgba(255, 255, 255, .05);
+            color: var(--text);
+            font-size: 12px
+        }
 
-    /* Tiny helper */
-    .rowcount{
-      font-variant-numeric: tabular-nums;
-    }
-  </style>
+        .controls {
+            display: grid;
+            grid-template-columns: 1.2fr 1.2fr auto 2.4fr auto;
+            gap: 12px;
+            align-items: end;
+            padding: 14px
+        }
+
+        @media (max-width:1050px) {
+            .controls {
+                grid-template-columns: 1fr 1fr auto
+            }
+
+            .controls .search {
+                grid-column: 1 / -1
+            }
+
+            .controls .apply {
+                grid-column: 1 / -1
+            }
+        }
+
+        .field label {
+            display: block;
+            color: var(--muted);
+            font-size: 12px;
+            margin: 0 0 6px 2px
+        }
+
+        .field input {
+            width: 100%;
+            padding: 11px 12px;
+            border-radius: 12px;
+            border: 1px solid var(--border);
+            outline: none;
+            background: linear-gradient(180deg, rgba(255, 255, 255, .06), rgba(255, 255, 255, .03));
+            color: var(--text);
+            box-shadow: inset 0 1px 0 rgba(255, 255, 255, .05);
+        }
+
+        .field input:focus {
+            border-color: var(--border2);
+            box-shadow: 0 0 0 3px rgba(106, 166, 255, .12), inset 0 1px 0 rgba(255, 255, 255, .06)
+        }
+
+        .btn {
+            padding: 11px 14px;
+            border-radius: 12px;
+            border: 1px solid var(--border);
+            background: linear-gradient(180deg, rgba(255, 255, 255, .06), rgba(255, 255, 255, .03));
+            color: var(--text);
+            cursor: pointer;
+            font-weight: 600;
+            letter-spacing: .2px;
+            box-shadow: var(--shadow);
+        }
+
+        .btn:hover {
+            border-color: rgba(120, 170, 255, .35)
+        }
+
+        .btn.primary {
+            border-color: rgba(106, 166, 255, .45);
+            box-shadow: 0 0 0 3px rgba(106, 166, 255, .08), var(--shadow)
+        }
+
+        .btn.primary:hover {
+            border-color: rgba(106, 166, 255, .7);
+            box-shadow: 0 0 0 3px rgba(106, 166, 255, .12), var(--shadow)
+        }
+
+        .summary {
+            padding: 0 14px 14px;
+            color: var(--muted);
+            border-bottom: 1px solid var(--border)
+        }
+
+        .tables {
+            padding: 16px 0 0;
+            display: flex;
+            flex-direction: column;
+            gap: 14px
+        }
+
+        .table-card {
+            border: 1px solid var(--border);
+            border-radius: var(--radius);
+            background: linear-gradient(180deg, rgba(255, 255, 255, .05), rgba(255, 255, 255, .025));
+            box-shadow: var(--shadow);
+            overflow: visible;
+        }
+
+        .card-head {
+            display: flex;
+            align-items: flex-start;
+            justify-content: space-between;
+            gap: 12px;
+            padding: 14px 16px 10px;
+            border-bottom: 1px solid var(--border)
+        }
+
+        .card-title {
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+            min-width: 0
+        }
+
+        .card-title .name {
+            font-weight: 800;
+            font-size: 14px;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis
+        }
+
+        .card-title .meta {
+            font-size: 12px;
+            color: var(--muted);
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            max-width: 900px
+        }
+
+        .pill {
+            flex: 0 0 auto;
+            padding: 6px 10px;
+            border-radius: 999px;
+            border: 1px solid rgba(106, 166, 255, .25);
+            background: rgba(106, 166, 255, .08);
+            font-size: 12px
+        }
+
+        .rowcount {
+            font-variant-numeric: tabular-nums
+        }
+
+        /* Fixes “first row tucked under sticky header” */
+        .table-scroll {
+            overflow: auto;
+            border-radius: 0 0 var(--radius) var(--radius);
+            padding-top: 2px;
+            scroll-padding-top: 44px;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: separate;
+            border-spacing: 0;
+            min-width: 920px
+        }
+
+        thead th {
+            position: sticky;
+            top: 0;
+            z-index: 5;
+            text-align: left;
+            padding: 12px 14px;
+            font-size: 12px;
+            color: var(--muted);
+            background: rgba(10, 14, 18, .92);
+            backdrop-filter: blur(6px);
+            border-bottom: 1px solid var(--border);
+        }
+
+        tbody td {
+            padding: 12px 14px;
+            border-bottom: 1px solid rgba(255, 255, 255, .06);
+            vertical-align: top;
+            line-height: 1.25
+        }
+
+        tbody tr:hover td {
+            background: rgba(106, 166, 255, .06)
+        }
+
+        tbody tr:last-child td {
+            border-bottom: none
+        }
+
+        .empty {
+            padding: 18px 14px;
+            color: var(--muted);
+            border-top: 1px solid var(--border)
+        }
+    </style>
 </head>
+
 <body>
-  <div class="container">
-    <div class="topbar">
-      <div class="brand">
-        <h1>GIS Data Viewer</h1>
-        <div class="sub">Filtered to stages: complete, precon complete, po, strike</div>
-      </div>
-      <div class="chip" title="CSV files are loaded from a manifest generated by your local CLI script.">
-        Static CSV mode
-      </div>
+    <div class="container">
+        <div class="topbar">
+            <div class="brand">
+                <h1>GIS Data Viewer</h1>
+                <div class="sub">Filtered to stages: complete, precon complete, po, strike</div>
+            </div>
+        </div>
+
+        <div class="controls">
+            <div class="field">
+                <label for="startDate">Start date</label>
+                <input id="startDate" type="date" />
+            </div>
+            <div class="field">
+                <label for="endDate">End date</label>
+                <input id="endDate" type="date" />
+            </div>
+            <div>
+                <button class="btn" id="defaultBtn" type="button">Set Default Range</button>
+            </div>
+            <div class="field search">
+                <label for="search">Search (street, city, district, address, cleared by)</label>
+                <input id="search" type="text" placeholder="type to filter rows..." />
+            </div>
+            <div class="apply">
+                <button class="btn primary" id="applyBtn" type="button">Apply</button>
+            </div>
+        </div>
+
+        <div class="summary" id="summary"></div>
+        <div class="tables" id="tables"></div>
     </div>
 
-    <div class="controls">
-      <div class="field">
-        <label for="startDate">Start date</label>
-        <input id="startDate" type="date" />
-      </div>
-      <div class="field">
-        <label for="endDate">End date</label>
-        <input id="endDate" type="date" />
-      </div>
-      <div>
-        <button class="btn" id="defaultBtn" type="button">Set Default Range</button>
-      </div>
-      <div class="field search">
-        <label for="search">Search (street, city, district, address, cleared by)</label>
-        <input id="search" type="text" placeholder="type to filter rows..." />
-      </div>
-      <div class="apply">
-        <button class="btn primary" id="applyBtn" type="button">Apply</button>
-      </div>
-    </div>
+    <script>
+        const STAGES_ALLOWED = new Set(["complete", "precon complete", "po", "strike"]);
 
-    <div class="summary" id="summary"></div>
+        const COLS = [
+            "stage",
+            "date_of_status_update",
+            "district",
+            "address",
+            "street_dir",
+            "street_name",
+            "city",
+            "cleared_by_employee"
+        ];
 
-    <div class="tables" id="tables"></div>
-  </div>
+        const MANIFEST_PATH = "data/manifest.json";
+        const CSV_BASE_DIR = "data/";
 
-<script>
-/**
- * Expected repo layout (generated by your Python CLI):
- *   /data/manifest.json
- *   /data/<somefile>.csv
- *
- * manifest.json format:
- * {
- *   "generated_at": "2026-01-08T03:12:55Z",
- *   "files": [
- *     { "path": "data/ATMOS_CO__Master_ATMOS_CO_2023__2026-01-08.csv", "label": "ATMOS CO — Master ATMOS CO 2023" }
- *   ]
- * }
- */
+        function pad2(n) { return String(n).padStart(2, "0"); }
+        function toISODate(d) { return `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}`; }
 
-const STAGES_ALLOWED = new Set(["complete","precon complete","po","strike"]);
-const COLS = [
-  "stage",
-  "date_of_status_update",
-  "district",
-  "address",
-  "street_dir",
-  "street_name",
-  "city",
-  "cleared_by_employee"
-];
+        function defaultRange() {
+            const now = new Date();
+            const day = now.getDay();
+            if (day === 1) {
+                const fri = new Date(now); fri.setDate(now.getDate() - 3);
+                const sat = new Date(now); sat.setDate(now.getDate() - 2);
+                return { start: toISODate(fri), end: toISODate(sat) };
+            }
+            const y = new Date(now); y.setDate(now.getDate() - 1);
+            return { start: toISODate(y), end: toISODate(y) };
+        }
 
-const ALT_DATE_COL_BY_FILENAME = (filenameLower) => {
-  // mirrors your rules: some layers use different date column names
-  if (filenameLower.includes("one gas line master") ||
-      ((filenameLower.includes("kansas") || filenameLower.includes("colorado")) && filenameLower.includes("line"))) {
-    return "status_update";
-  }
-  if (filenameLower.includes("sewer_gardner_ks")) return "last_status_update";
-  return "date_of_last_status_update";
-};
+        function parseDateLoose(s) {
+            if (!s) return null;
+            const str = String(s).trim();
+            if (!str) return null;
 
-const ALT_CLEARED_BY_COL_BY_FILENAME = (filenameLower) => {
-  // mirrors your rules: line files use 'cleared_by', sewer_gardner uses 'cleared_by_team_number'
-  if (((filenameLower.includes("kansas") || filenameLower.includes("colorado")) && filenameLower.includes("line"))) {
-    return "cleared_by";
-  }
-  if (filenameLower.includes("sewer_gardner_ks")) return "cleared_by_team_number";
-  return "cleared_by_employee";
-};
+            // normalized outputs should already be ISO YYYY-MM-DD
+            if (/^\d{4}-\d{2}-\d{2}$/.test(str)) return str;
 
-function pad2(n){ return String(n).padStart(2,"0"); }
-function toISODate(d){
-  return `${d.getFullYear()}-${pad2(d.getMonth()+1)}-${pad2(d.getDate())}`;
-}
-function defaultRange(){
-  const now = new Date();
-  const day = now.getDay(); // 0 Sun, 1 Mon...
-  if (day === 1) { // Monday
-    const fri = new Date(now); fri.setDate(now.getDate() - 3);
-    const sat = new Date(now); sat.setDate(now.getDate() - 2);
-    return {start: toISODate(fri), end: toISODate(sat)};
-  }
-  const y = new Date(now); y.setDate(now.getDate() - 1);
-  return {start: toISODate(y), end: toISODate(y)};
-}
+            let m = str.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
+            if (m) return `${m[3]}-${pad2(m[1])}-${pad2(m[2])}`;
 
-function parseDateLoose(s){
-  if (!s) return null;
-  const str = String(s).trim();
-  if (!str) return null;
+            m = str.match(/^(\d{1,2})-(\d{1,2})-(\d{4})$/);
+            if (m) return `${m[3]}-${pad2(m[1])}-${pad2(m[2])}`;
 
-  // already ISO
-  if (/^\d{4}-\d{2}-\d{2}$/.test(str)) return str;
+            m = str.match(/^(\d{4})\/(\d{1,2})\/(\d{1,2})$/);
+            if (m) return `${m[1]}-${pad2(m[2])}-${pad2(m[3])}`;
 
-  // m/d/yyyy or mm/dd/yyyy
-  let m = str.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
-  if (m){
-    const mm = pad2(m[1]), dd = pad2(m[2]), yyyy = m[3];
-    return `${yyyy}-${mm}-${dd}`;
-  }
+            return null;
+        }
 
-  // m-d-yyyy
-  m = str.match(/^(\d{1,2})-(\d{1,2})-(\d{4})$/);
-  if (m){
-    const mm = pad2(m[1]), dd = pad2(m[2]), yyyy = m[3];
-    return `${yyyy}-${mm}-${dd}`;
-  }
+        function inRange(iso, start, end) { return iso && iso >= start && iso <= end; }
 
-  // yyyy/mm/dd
-  m = str.match(/^(\d{4})\/(\d{1,2})\/(\d{1,2})$/);
-  if (m){
-    const yyyy = m[1], mm = pad2(m[2]), dd = pad2(m[3]);
-    return `${yyyy}-${mm}-${dd}`;
-  }
+        function csvParse(text) {
+            const rows = [];
+            let i = 0, field = "", row = [], inQuotes = false;
 
-  return null;
-}
+            function pushField() { row.push(field); field = ""; }
+            function pushRow() { rows.push(row); row = []; }
 
-function inRange(iso, start, end){
-  return iso && iso >= start && iso <= end;
-}
+            while (i < text.length) {
+                const c = text[i];
+                if (inQuotes) {
+                    if (c === '"') {
+                        if (text[i + 1] === '"') { field += '"'; i++; }
+                        else inQuotes = false;
+                    } else field += c;
+                } else {
+                    if (c === '"') inQuotes = true;
+                    else if (c === ',') pushField();
+                    else if (c === '\r') { }
+                    else if (c === '\n') { pushField(); pushRow(); }
+                    else field += c;
+                }
+                i++;
+            }
+            if (field.length || row.length) { pushField(); pushRow(); }
 
-function csvParse(text){
-  // basic CSV parser that handles quoted fields
-  const rows = [];
-  let i=0, field="", row=[], inQuotes=false;
+            if (!rows.length) return { headers: [], data: [] };
+            const headers = rows[0].map(h => String(h || "").trim());
+            const data = rows.slice(1).filter(r => r.some(x => String(x || "").trim() !== ""));
+            return { headers, data };
+        }
 
-  function pushField(){ row.push(field); field=""; }
-  function pushRow(){ rows.push(row); row=[]; }
+        function headersMatchNormalized(headers) {
+            const set = new Set(headers.map(h => String(h || "").trim()));
+            for (const c of COLS) {
+                if (!set.has(c)) return false;
+            }
+            return true;
+        }
 
-  while (i < text.length){
-    const c = text[i];
+        // IMPORTANT: if file is already normalized, do NOT try to guess alternate column names.
+        function normalizeRows(headers, data) {
+            const idx = new Map();
+            headers.forEach((h, j) => idx.set(h, j));
+            const get = (row, col) => {
+                const j = idx.get(col);
+                if (j === undefined) return "";
+                return row[j] ?? "";
+            };
 
-    if (inQuotes){
-      if (c === '"'){
-        if (text[i+1] === '"'){ field+='"'; i++; }
-        else inQuotes = false;
-      } else {
-        field += c;
-      }
-    } else {
-      if (c === '"'){
-        inQuotes = true;
-      } else if (c === ','){
-        pushField();
-      } else if (c === '\r'){
-        // ignore
-      } else if (c === '\n'){
-        pushField();
-        pushRow();
-      } else {
-        field += c;
-      }
-    }
-    i++;
-  }
-  // last field/row
-  if (field.length || row.length){
-    pushField();
-    pushRow();
-  }
+            const out = [];
+            for (const r of data) {
+                const stageRaw = String(get(r, "stage") || "").trim();
+                const stageLower = stageRaw.toLowerCase();
+                if (!STAGES_ALLOWED.has(stageLower)) continue;
 
-  if (!rows.length) return {headers:[], data:[]};
-  const headers = rows[0].map(h => String(h || "").trim());
-  const data = rows.slice(1).filter(r => r.some(x => String(x||"").trim() !== ""));
-  return {headers, data};
-}
+                const isoDate = parseDateLoose(String(get(r, "date_of_status_update") || "").trim());
+                if (!isoDate) continue;
 
-function normalizeRows(filename, headers, data){
-  const filenameLower = filename.toLowerCase();
-  const dateCol = ALT_DATE_COL_BY_FILENAME(filenameLower);
-  const clearedCol = ALT_CLEARED_BY_COL_BY_FILENAME(filenameLower);
+                out.push({
+                    stage: stageRaw,
+                    date_of_status_update: isoDate,
+                    district: String(get(r, "district") || "").trim(),
+                    address: String(get(r, "address") || "").trim(),
+                    street_dir: String(get(r, "street_dir") || "").trim(),
+                    street_name: String(get(r, "street_name") || "").trim(),
+                    city: String(get(r, "city") || "").trim(),
+                    cleared_by_employee: String(get(r, "cleared_by_employee") || "").trim()
+                });
+            }
 
-  // map header -> index
-  const idx = new Map();
-  headers.forEach((h, j) => idx.set(h, j));
+            out.sort((a, b) => {
+                for (const c of COLS) {
+                    const av = (a[c] ?? "").toString().toLowerCase();
+                    const bv = (b[c] ?? "").toString().toLowerCase();
+                    if (av < bv) return -1;
+                    if (av > bv) return 1;
+                }
+                return 0;
+            });
 
-  function get(row, col){
-    const j = idx.get(col);
-    if (j === undefined) return "";
-    return row[j] ?? "";
-  }
+            return out;
+        }
 
-  const out = [];
-  for (const r of data){
-    const stageRaw = String(get(r, "stage") || "").trim();
-    const stageLower = stageRaw.toLowerCase();
+        function textMatch(row, q) {
+            if (!q) return true;
+            const s = q.toLowerCase();
+            const hay = [
+                row.street_name,
+                row.city,
+                row.district,
+                row.address,
+                row.cleared_by_employee,
+                row.street_dir,
+                row.stage
+            ].join(" ").toLowerCase();
+            return hay.includes(s);
+        }
 
-    if (!STAGES_ALLOWED.has(stageLower)) continue;
+        function el(tag, attrs = {}, children = []) {
+            const e = document.createElement(tag);
+            for (const [k, v] of Object.entries(attrs)) {
+                if (k === "class") e.className = v;
+                else if (k === "text") e.textContent = v;
+                else e.setAttribute(k, v);
+            }
+            for (const c of children) e.appendChild(c);
+            return e;
+        }
 
-    const dateRaw = String(get(r, dateCol) || "").trim();
-    const isoDate = parseDateLoose(dateRaw);
-    if (!isoDate) continue; // no date => useless for date filtering
+        function resolveURL(path) {
+            return new URL(path, document.baseURI).toString();
+        }
 
-    const district = String(get(r, "district") || "").trim();
-    const address = String(get(r, "address") || "").trim();
+        function resolveCSVPath(manifestFileValue) {
+            let p = String(manifestFileValue || "").trim();
+            if (!p) return null;
+            if (p.startsWith("data/")) return p;
+            if (p.startsWith("./")) p = p.slice(2);
+            return CSV_BASE_DIR + p; // data/normalized/...
+        }
 
-    // street dir naming differs in line files, but you asked to normalize to street_dir
-    const streetDir = String(get(r, "street_dir") || get(r, "street_direction") || "").trim();
-    const streetName = String(get(r, "street_name") || "").trim();
-    const city = String(get(r, "city") || "").trim();
+        async function loadManifest() {
+            const res = await fetch(resolveURL(MANIFEST_PATH), { cache: "no-store" });
+            if (!res.ok) throw new Error(`Failed to load ${MANIFEST_PATH} (${res.status})`);
+            return await res.json();
+        }
 
-    const clearedBy = String(get(r, clearedCol) || "").trim();
+        function normalizeManifestFiles(manifest) {
+            const raw = Array.isArray(manifest) ? manifest : (manifest.files || []);
+            const out = [];
+            for (const item of raw) {
+                if (typeof item === "string") {
+                    out.push({ file: item, label: item.replace(/^.*[\\/]/, "").replace(/\.csv$/i, "") });
+                } else if (item && typeof item === "object") {
+                    const file = item.file || item.path || item.filename || item.url;
+                    const label = `${item.map_name || ""}${item.layer_name ? (item.map_name ? " — " : "") + item.layer_name : ""}`.trim()
+                        || file?.replace(/^.*[\\/]/, "").replace(/\.csv$/i, "")
+                        || "Unknown file";
+                    out.push({ file, label });
+                } else {
+                    out.push({ file: null, label: "Unknown file" });
+                }
+            }
+            return out;
+        }
 
-    out.push({
-      stage: stageRaw,
-      date_of_status_update: isoDate,
-      district,
-      address,
-      street_dir: streetDir,
-      street_name: streetName,
-      city,
-      cleared_by_employee: clearedBy
-    });
-  }
+        async function loadCSV(path) {
+            const res = await fetch(resolveURL(path), { cache: "no-store" });
+            if (!res.ok) throw new Error(`Failed to load CSV: ${path} (${res.status})`);
+            return await res.text();
+        }
 
-  // sort within file by your required order (all asc)
-  out.sort((a,b) => {
-    for (const c of COLS){
-      const av = (a[c] ?? "").toString().toLowerCase();
-      const bv = (b[c] ?? "").toString().toLowerCase();
-      if (av < bv) return -1;
-      if (av > bv) return 1;
-    }
-    return 0;
-  });
+        function renderTableCard(fileLabel, filePath, rows) {
+            const card = el("div", { class: "table-card" });
+            const head = el("div", { class: "card-head" });
+            const title = el("div", { class: "card-title" }, [
+                el("div", { class: "name", text: fileLabel }),
+                el("div", { class: "meta", text: filePath || "(missing file path in manifest)" })
+            ]);
+            const pill = el("div", { class: "pill rowcount", text: `${rows.length} row${rows.length === 1 ? "" : "s"}` });
+            head.appendChild(title);
+            head.appendChild(pill);
+            card.appendChild(head);
 
-  return out;
-}
+            if (!rows.length) {
+                card.appendChild(el("div", { class: "empty", text: "No rows matched the selected date range and filters." }));
+                return card;
+            }
 
-function textMatch(row, q){
-  if (!q) return true;
-  const s = q.toLowerCase();
-  const hay = [
-    row.street_name,
-    row.city,
-    row.district,
-    row.address,
-    row.cleared_by_employee,
-    row.street_dir,
-    row.stage
-  ].join(" ").toLowerCase();
-  return hay.includes(s);
-}
+            const scroll = el("div", { class: "table-scroll" });
+            const table = el("table");
 
-function el(tag, attrs={}, children=[]){
-  const e = document.createElement(tag);
-  for (const [k,v] of Object.entries(attrs)){
-    if (k === "class") e.className = v;
-    else if (k === "text") e.textContent = v;
-    else e.setAttribute(k, v);
-  }
-  for (const c of children) e.appendChild(c);
-  return e;
-}
+            const thead = el("thead");
+            const trh = el("tr");
+            for (const c of COLS) trh.appendChild(el("th", { text: c }));
+            thead.appendChild(trh);
 
-async function loadManifest(){
-  const res = await fetch("data/manifest.json", {cache:"no-store"});
-  if (!res.ok) throw new Error(`Failed to load manifest.json (${res.status})`);
-  return await res.json();
-}
+            const tbody = el("tbody");
+            for (const r of rows) {
+                const tr = el("tr");
+                for (const c of COLS) tr.appendChild(el("td", { text: r[c] ?? "" }));
+                tbody.appendChild(tr);
+            }
 
-async function loadCSV(path){
-  const res = await fetch(path, {cache:"no-store"});
-  if (!res.ok) throw new Error(`Failed to load CSV: ${path} (${res.status})`);
-  return await res.text();
-}
+            table.appendChild(thead);
+            table.appendChild(tbody);
+            scroll.appendChild(table);
+            card.appendChild(scroll);
+            return card;
+        }
 
-function renderTableCard(fileLabel, filePath, rows){
-  const card = el("div", {class:"table-card"});
-  const head = el("div", {class:"card-head"});
+        function sortFilesNewestFirst(files) {
+            function dateFromPath(p) {
+                const m = String(p || "").match(/(\d{4}-\d{2}-\d{2})/);
+                return m ? m[1] : "";
+            }
+            return [...files].sort((a, b) => {
+                const da = dateFromPath(a.file);
+                const db = dateFromPath(b.file);
+                if (da && db && da !== db) return db.localeCompare(da);
+                return String(b.file || "").localeCompare(String(a.file || ""));
+            });
+        }
 
-  const title = el("div", {class:"card-title"}, [
-    el("div", {class:"name", text:fileLabel}),
-    el("div", {class:"meta", text:filePath})
-  ]);
+        async function apply() {
+            const start = document.getElementById("startDate").value;
+            const end = document.getElementById("endDate").value;
+            const q = document.getElementById("search").value.trim();
 
-  const pill = el("div", {class:"pill rowcount", text:`${rows.length} row${rows.length===1?"":"s"}`});
+            const summary = document.getElementById("summary");
+            const tables = document.getElementById("tables");
+            tables.innerHTML = "";
 
-  head.appendChild(title);
-  head.appendChild(pill);
+            if (!start || !end) { summary.textContent = "Pick a start and end date."; return; }
+            if (start > end) { summary.textContent = "Start date cannot be after end date."; return; }
 
-  card.appendChild(head);
+            let manifest;
+            try {
+                manifest = await loadManifest();
+            } catch (err) {
+                summary.textContent = err.message;
+                return;
+            }
 
-  if (!rows.length){
-    card.appendChild(el("div", {class:"empty", text:"No rows matched the selected date range and filters."}));
-    return card;
-  }
+            const files = sortFilesNewestFirst(normalizeManifestFiles(manifest));
+            if (!files.length) { summary.textContent = "manifest.json has no files."; return; }
 
-  const scroll = el("div", {class:"table-scroll"});
-  const table = el("table");
+            let totalRows = 0;
+            let shownTables = 0;
 
-  const thead = el("thead");
-  const trh = el("tr");
-  for (const c of COLS){
-    trh.appendChild(el("th", {text: c}));
-  }
-  thead.appendChild(trh);
+            for (const f of files) {
+                const csvPath = resolveCSVPath(f.file);
 
-  const tbody = el("tbody");
-  for (const r of rows){
-    const tr = el("tr");
-    for (const c of COLS){
-      tr.appendChild(el("td", {text: r[c] ?? ""}));
-    }
-    tbody.appendChild(tr);
-  }
+                if (!csvPath) {
+                    const card = el("div", { class: "table-card" });
+                    card.appendChild(el("div", { class: "card-head" }, [
+                        el("div", { class: "card-title" }, [
+                            el("div", { class: "name", text: f.label || "Bad manifest entry" }),
+                            el("div", { class: "meta", text: "Manifest entry is missing a file/path field." })
+                        ]),
+                        el("div", { class: "pill", text: "error" })
+                    ]));
+                    card.appendChild(el("div", { class: "empty", text: "Fix data/manifest.json: each entry must include a file path." }));
+                    tables.appendChild(card);
+                    continue;
+                }
 
-  table.appendChild(thead);
-  table.appendChild(tbody);
-  scroll.appendChild(table);
-  card.appendChild(scroll);
-  return card;
-}
+                let text;
+                try {
+                    text = await loadCSV(csvPath);
+                } catch (err) {
+                    const card = el("div", { class: "table-card" });
+                    card.appendChild(el("div", { class: "card-head" }, [
+                        el("div", { class: "card-title" }, [
+                            el("div", { class: "name", text: f.label || f.file || "CSV" }),
+                            el("div", { class: "meta", text: csvPath })
+                        ]),
+                        el("div", { class: "pill", text: "error" })
+                    ]));
+                    card.appendChild(el("div", { class: "empty", text: err.message }));
+                    tables.appendChild(card);
+                    continue;
+                }
 
-function sortFilesNewestFirst(files){
-  // Try to extract yyyy-mm-dd from filename and sort desc; fallback alphabetical desc
-  function dateFromPath(p){
-    const m = String(p).match(/(\d{4}-\d{2}-\d{2})/);
-    return m ? m[1] : "";
-  }
-  return [...files].sort((a,b) => {
-    const da = dateFromPath(a.path);
-    const db = dateFromPath(b.path);
-    if (da && db && da !== db) return db.localeCompare(da);
-    // tie-breaker: label/path desc so newest-ish comes first
-    return String(b.path).localeCompare(String(a.path));
-  });
-}
+                const parsed = csvParse(text);
 
-async function apply(){
-  const start = document.getElementById("startDate").value;
-  const end = document.getElementById("endDate").value;
-  const q = document.getElementById("search").value.trim();
+                // If headers don't match normalized schema, show a loud error instead of silently returning 0.
+                if (!headersMatchNormalized(parsed.headers)) {
+                    const card = el("div", { class: "table-card" });
+                    card.appendChild(el("div", { class: "card-head" }, [
+                        el("div", { class: "card-title" }, [
+                            el("div", { class: "name", text: f.label || f.file || "CSV" }),
+                            el("div", { class: "meta", text: csvPath })
+                        ]),
+                        el("div", { class: "pill", text: "error" })
+                    ]));
+                    card.appendChild(el("div", {
+                        class: "empty", text:
+                            `CSV headers do not match expected normalized schema.\nExpected: ${COLS.join(", ")}\nGot: ${parsed.headers.join(", ")}`
+                    }));
+                    tables.appendChild(card);
+                    continue;
+                }
 
-  const summary = document.getElementById("summary");
-  const tables = document.getElementById("tables");
-  tables.innerHTML = "";
+                const normalized = normalizeRows(parsed.headers, parsed.data);
+                const ranged = normalized.filter(r => inRange(r.date_of_status_update, start, end));
+                const filtered = ranged.filter(r => textMatch(r, q));
 
-  if (!start || !end){
-    summary.textContent = "Pick a start and end date.";
-    return;
-  }
-  if (start > end){
-    summary.textContent = "Start date cannot be after end date.";
-    return;
-  }
+                if (filtered.length) {
+                    shownTables++;
+                    totalRows += filtered.length;
+                    tables.appendChild(renderTableCard(f.label || f.file || csvPath, csvPath, filtered));
+                }
+            }
 
-  let manifest;
-  try{
-    manifest = await loadManifest();
-  }catch(err){
-    summary.textContent = `Could not load data/manifest.json. ${err.message}`;
-    return;
-  }
+            summary.textContent =
+                `Showing ${shownTables} table${shownTables === 1 ? "" : "s"} (${totalRows} row${totalRows === 1 ? "" : "s"}) for ${start} → ${end}.`;
+        }
 
-  const files = sortFilesNewestFirst(manifest.files || []);
-  if (!files.length){
-    summary.textContent = "manifest.json has no files.";
-    return;
-  }
+        (function init() {
+            const d = defaultRange();
+            document.getElementById("startDate").value = d.start;
+            document.getElementById("endDate").value = d.end;
 
-  let totalRows = 0;
-  let shownTables = 0;
+            document.getElementById("defaultBtn").addEventListener("click", () => {
+                const d2 = defaultRange();
+                document.getElementById("startDate").value = d2.start;
+                document.getElementById("endDate").value = d2.end;
+            });
 
-  // load each csv, normalize, filter, then render if anything remains
-  for (const f of files){
-    let text;
-    try{
-      text = await loadCSV(f.path);
-    }catch(err){
-      // show a card with the error so you notice broken paths on GH pages
-      const card = el("div", {class:"table-card"});
-      card.appendChild(el("div", {class:"card-head"}, [
-        el("div", {class:"card-title"}, [
-          el("div", {class:"name", text: f.label || f.path}),
-          el("div", {class:"meta", text: f.path})
-        ]),
-        el("div", {class:"pill", text:"error"})
-      ]));
-      card.appendChild(el("div", {class:"empty", text: err.message}));
-      tables.appendChild(card);
-      continue;
-    }
+            document.getElementById("applyBtn").addEventListener("click", apply);
+            document.getElementById("search").addEventListener("keydown", (e) => {
+                if (e.key === "Enter") apply();
+            });
 
-    const parsed = csvParse(text);
-    const normalized = normalizeRows(f.path, parsed.headers, parsed.data);
-
-    // date-range filter
-    const ranged = normalized.filter(r => inRange(r.date_of_status_update, start, end));
-
-    // search filter
-    const filtered = ranged.filter(r => textMatch(r, q));
-
-    if (filtered.length){
-      shownTables++;
-      totalRows += filtered.length;
-      tables.appendChild(renderTableCard(f.label || f.path, f.path, filtered));
-    }
-  }
-
-  summary.textContent =
-    `Showing ${shownTables} table${shownTables===1?"":"s"} (${totalRows} row${totalRows===1?"":"s"}) for ${start} → ${end}.`;
-}
-
-(function init(){
-  const {start, end} = defaultRange();
-  const startEl = document.getElementById("startDate");
-  const endEl = document.getElementById("endDate");
-  startEl.value = start;
-  endEl.value = end;
-
-  document.getElementById("defaultBtn").addEventListener("click", () => {
-    const d = defaultRange();
-    startEl.value = d.start;
-    endEl.value = d.end;
-  });
-
-  document.getElementById("applyBtn").addEventListener("click", apply);
-
-  // Enter key triggers Apply
-  document.getElementById("search").addEventListener("keydown", (e) => {
-    if (e.key === "Enter") apply();
-  });
-
-  // initial render
-  apply();
-})();
-</script>
+            apply();
+        })();
+    </script>
 </body>
+
 </html>
