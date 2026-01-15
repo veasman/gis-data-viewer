@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-01-12T05:50:28",
+  "generated_at": "2026-01-15T02:57:00",
   "columns": [
     "stage",
     "date_of_status_update",
@@ -12,20 +12,28 @@
   ],
   "files": [
     {
+      "file": "normalized/One Gas__One Gas 2024.csv",
+      "map_name": "One Gas",
+      "layer_name": "One Gas 2024",
+      "row_count": 1141,
+      "min_date": "2024-04-29",
+      "max_date": "2026-01-14"
+    },
+    {
       "file": "normalized/ATMOS KS__Master ATMOS KS 2023.csv",
       "map_name": "ATMOS KS",
       "layer_name": "Master ATMOS KS 2023",
-      "row_count": 13118,
+      "row_count": 13163,
       "min_date": "2003-05-04",
-      "max_date": "2026-01-09"
+      "max_date": "2026-01-14"
     },
     {
       "file": "normalized/ATMOS CO__Master ATMOS CO 2023.csv",
       "map_name": "ATMOS CO",
       "layer_name": "Master ATMOS CO 2023",
-      "row_count": 8365,
+      "row_count": 8388,
       "min_date": "1993-10-03",
-      "max_date": "2026-01-09"
+      "max_date": "2026-01-14"
     },
     {
       "file": "normalized/PRECON_Master__Precon 2022.csv",
@@ -42,14 +50,6 @@
       "row_count": 19,
       "min_date": "2025-05-13",
       "max_date": "2026-01-07"
-    },
-    {
-      "file": "normalized/One Gas__One Gas 2024.csv",
-      "map_name": "One Gas",
-      "layer_name": "One Gas 2024",
-      "row_count": 1134,
-      "min_date": "2024-04-29",
-      "max_date": "2026-01-05"
     },
     {
       "file": "normalized/ATMOS Kansas 2025__Kansas_Line_Master_2025.csv",
