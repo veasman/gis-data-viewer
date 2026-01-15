@@ -40,6 +40,7 @@ class GISCloudQCExporter:
             "1166936": "3082877",  # PRECON_Master
             "2934234": "7127604",  # Colorado 2025
             "2937762": "7135311",  # Kansas 2025
+            "2662324": "6515164",  # One Gas 2024
         }
 
         self.allowed_stages = {"complete", "precon complete", "po", "strike"}
@@ -298,6 +299,7 @@ class GISCloudQCExporter:
             print(f"{i}. {map_data.get('name', 'Unnamed Map')} (ID: {map_data.get('id')})")
 
         selected = input("\nEnter map numbers (comma separated) or 'all': ").strip()
+        selected = "all"
         if selected.lower() == "all":
             selected_maps = maps
         else:
