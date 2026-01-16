@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-01-15T14:19:37",
+  "generated_at": "2026-01-16T07:09:50",
   "columns": [
     "stage",
     "date_of_status_update",
@@ -15,7 +15,7 @@
       "file": "normalized/ATMOS KS__Master ATMOS KS 2023.csv",
       "map_name": "ATMOS KS",
       "layer_name": "Master ATMOS KS 2023",
-      "row_count": 13190,
+      "row_count": 13194,
       "min_date": "2003-05-04",
       "max_date": "2026-01-15"
     },
@@ -23,7 +23,7 @@
       "file": "normalized/ATMOS CO__Master ATMOS CO 2023.csv",
       "map_name": "ATMOS CO",
       "layer_name": "Master ATMOS CO 2023",
-      "row_count": 8395,
+      "row_count": 8397,
       "min_date": "1993-10-03",
       "max_date": "2026-01-15"
     },

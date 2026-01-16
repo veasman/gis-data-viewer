@@ -294,11 +294,11 @@ class GISCloudQCExporter:
             print("No maps matched keywords:", ", ".join(self.keywords))
             return
 
-        print("\nAvailable Maps:")
-        for i, map_data in enumerate(maps, 1):
-            print(f"{i}. {map_data.get('name', 'Unnamed Map')} (ID: {map_data.get('id')})")
+        # print("\nAvailable Maps:")
+        # for i, map_data in enumerate(maps, 1):
+        #     print(f"{i}. {map_data.get('name', 'Unnamed Map')} (ID: {map_data.get('id')})")
 
-        selected = input("\nEnter map numbers (comma separated) or 'all': ").strip()
+        # selected = input("\nEnter map numbers (comma separated) or 'all': ").strip()
         selected = "all"
         if selected.lower() == "all":
             selected_maps = maps
