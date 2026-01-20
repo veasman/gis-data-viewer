@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-01-19T06:47:55",
+  "generated_at": "2026-01-20T08:57:03",
   "columns": [
     "stage",
     "date_of_status_update",
@@ -11,6 +11,14 @@
     "cleared_by_employee"
   ],
   "files": [
+    {
+      "file": "normalized/ATMOS KS__Master ATMOS KS 2023.csv",
+      "map_name": "ATMOS KS",
+      "layer_name": "Master ATMOS KS 2023",
+      "row_count": 13209,
+      "min_date": "2003-05-04",
+      "max_date": "2026-01-19"
+    },
     {
       "file": "normalized/ATMOS CO__Master ATMOS CO 2023.csv",
       "map_name": "ATMOS CO",
@@ -25,14 +33,6 @@
       "layer_name": "One Gas 2024",
       "row_count": 1147,
       "min_date": "2024-04-29",
-      "max_date": "2026-01-16"
-    },
-    {
-      "file": "normalized/ATMOS KS__Master ATMOS KS 2023.csv",
-      "map_name": "ATMOS KS",
-      "layer_name": "Master ATMOS KS 2023",
-      "row_count": 13205,
-      "min_date": "2003-05-04",
       "max_date": "2026-01-16"
     },
     {
