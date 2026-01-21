@@ -371,11 +371,7 @@ class GISCloudQCExporter:
 
 
 if __name__ == "__main__":
-    # Stop hardcoding your API key in source. That's trash opsec.
-    api_key = os.getenv("GIS_CLOUD_API_KEY", "").strip()
-***REMOVED***
-        # api_key = input("Enter GIS Cloud API key: ").strip()
-***REMOVED***
+    api_key = os.getenv("GIS_API_KEY", "").strip()
 
     exporter = GISCloudQCExporter(api_key, out_root="data")
 
