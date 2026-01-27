@@ -389,29 +389,31 @@
         // Default range = previous Mon..Sat. If today is Sunday, use week that just ended.
         function defaultRange() {
             const now = new Date();
-            const wd = now.getDay(); // Sun=0, Mon=1 ... Sat=6
+            const day = now.getDay(); // Sun=0..Sat=6
 
-            // convert to Mon=0..Sun=6 like python
-            const pyWd = (wd === 0) ? 6 : (wd - 1);
-
-            let endSat;
-            if (pyWd === 6) {
-                // Sunday -> end = yesterday (Saturday)
-                endSat = new Date(now);
+            // Sunday: use the week that just ended (Mon..Sat)
+            if (day === 0) {
+                const endSat = new Date(now);
                 endSat.setDate(now.getDate() - 1);
-            } else {
-                // previous Saturday strictly before today; if today is Saturday, go back 7
-                let daysBack;
-                if (pyWd === 5) daysBack = 7;
-                else daysBack = (pyWd - 5 + 7) % 7;
-                endSat = new Date(now);
-                endSat.setDate(now.getDate() - daysBack);
+
+                const startMon = new Date(endSat);
+                startMon.setDate(endSat.getDate() - 5);
+
+                return { start: toISODate(startMon), end: toISODate(endSat) };
             }
 
-            const startMon = new Date(endSat);
-            startMon.setDate(endSat.getDate() - 5);
+            // Monday: last Fri..Sat
+            if (day === 1) {
+                const fri = new Date(now); fri.setDate(now.getDate() - 3);
+                const sat = new Date(now); sat.setDate(now.getDate() - 2);
+                return { start: toISODate(fri), end: toISODate(sat) };
+            }
 
-            return { start: toISODate(startMon), end: toISODate(endSat) };
+            // Otherwise: yesterday only
+            const y = new Date(now);
+            y.setDate(now.getDate() - 1);
+            const iso = toISODate(y);
+            return { start: iso, end: iso };
         }
 
         function parseDateLoose(s) {
