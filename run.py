@@ -1,52 +1,55 @@
 #!/usr/bin/env python3
-import requests
-import json
 import os
 import csv
+import json
 import re
-from datetime import datetime, timedelta, date
+import requests
 from pathlib import Path
+from datetime import datetime, timedelta, date
 
-class GISCloudQCExporter:
+
+class GISCloudWeeklyExporter:
     """
-    Interactive CLI that:
-      1) Lists shared maps (filtered by keywords)
-      2) Auto-selects known layers by map_id OR prompts user to pick a layer
-      3) Downloads all features for the chosen layer(s)
-      4) Normalizes + filters rows:
-         - stage lowercased must be in: complete, precon complete, po, strike
-         - sorts by: stage, date_of_status_update, district, address, street_dir, street_name, city, cleared_by_employee
-      5) Writes CSV(s) into repo folder: data/normalized/
-      6) Writes manifest: data/manifest.json (for index.html)
+    Exports weekly GISCloud data for selected maps/layers and generates:
+      1) data/normalized/*.csv files (still compatible with the existing index.html viewer)
+         - MUST include: stage, date_of_status_update, district, address, street_dir, street_name, city, cleared_by_employee
+         - MAY include extra columns (we keep them), including:
+           - photo_of_map / photo_map
+           - site_photo / site_photos
+           - crew_lead / crew_tech
+         - strips internal keys starting with "__" (so no __fid, __confidence, __layer_id, etc.)
 
-    Output CSV columns (in order):
-      stage, date_of_status_update, district, address, street_dir, street_name, city, cleared_by_employee
+      2) data/errors/photo_errors.csv (photo validation errors only, for website viewing)
+         - includes map/site photo fields + crew_lead/crew_tech for spreadsheet use
+
+      3) data/manifest.json
+         - includes "files" list (for main viewer)
+         - includes "photo_errors_file" path (for errors viewer)
     """
 
-    def __init__(self, api_key, out_root="data"):
-        self.api_key = api_key
+    def __init__(self, api_key: str, out_root: str = "data"):
+        self.api_key = (api_key or "").strip()
         self.base_url = "https://api.giscloud.com/1"
-        self.headers = {"API-Key": api_key}
+        self.headers = {"API-Key": self.api_key}
         self.out_root = Path(out_root)
-        self.out_dir = self.out_root / "normalized"
+        self.normalized_dir = self.out_root / "normalized"
+        self.errors_dir = self.out_root / "errors"
 
-        # Map filtering (same spirit as your script)
+        # Map name filter (restore your original behavior)
         self.keywords = ["ATMOS", "PRECON", "One Gas"]
 
-        # Predefined layers for each map ID (your current ones)
+        # Auto layers (as requested)
         self.auto_layers = {
-            "1409686": "3667832",  # ATMOS KS
-            "1843533": "4688672",  # ATMOS CO
-            "1166936": "3082877",  # PRECON_Master
-            "2934234": "7127604",  # Colorado 2025
-            "2937762": "7135311",  # Kansas 2025
-            "2662324": "6515164",  # One Gas 2024
+            "1409686": ["3667832"],            # ATMOS KS
+            "1843533": ["4688672"],            # ATMOS CO
+            "1166936": ["3082877"],            # PRECON_Master
+            "2934234": ["7127604"],            # Colorado 2025
+            "2937762": ["7135311"],            # Kansas 2025
+            "2662324": ["6515164", "6728851"], # One Gas 2024 and One Gas Line Master 2025
         }
 
-        self.allowed_stages = {"complete", "precon complete", "po", "strike"}
-
-        # Keep it deterministic: fixed output schema
-        self.out_columns = [
+        # The viewer expects these columns to exist (can have extras too)
+        self.viewer_required_cols = [
             "stage",
             "date_of_status_update",
             "district",
@@ -57,92 +60,113 @@ class GISCloudQCExporter:
             "cleared_by_employee",
         ]
 
-        # Candidate field names (because GIS Cloud data is never consistent)
+        # Date candidates used for filtering + normalization
+        self.date_candidates = [
+            "date_of_status_update",
+            "date_of_last_status_update",
+            "status_update",
+            "last_status_update",
+            "updated_at",
+            "date",
+        ]
+
+        # Stage candidates (keep both; viewer uses "stage")
         self.stage_candidates = ["stage", "pv_stage"]
-        self.date_candidates = ["date_of_status_update", "date_of_last_status_update", "status_update", "last_status_update"]
-        self.cleared_by_candidates = ["cleared_by_employee", "cleared_by", "cleared_by_team_number"]
+
+        # Truck candidates (for errors spreadsheet)
+        self.truck_candidates = ["cleared_by_employee", "cleared_by", "cleared_by_team_number"]
 
     # ----------------------------
-    # API calls (kept like your script)
+    # Date window: previous Mon..Sat; Sunday uses week that just ended.
     # ----------------------------
-    def get_shared_maps(self):
-        """Fetch shared maps from GIS Cloud API"""
-        try:
-            urls_to_try = [
-                f"{self.base_url}/maps.json?type=shared",
-                f"{self.base_url}/maps.json?type=private,shared",
-                f"{self.base_url}/maps.json",
-            ]
+    def previous_week_monday_to_saturday(self):
+        today = date.today()
+        wd = today.weekday()  # Mon=0 ... Sun=6
 
-            for url in urls_to_try:
-                response = requests.get(url, headers=self.headers, timeout=60)
-                if response.status_code == 200:
-                    data = response.json()
-                    if "data" in data and data["data"]:
-                        return data["data"]
+        if wd == 6:
+            end_sat = today - timedelta(days=1)
+        else:
+            # Previous Saturday (strictly before today). If today is Saturday, go back 7 days.
+            if wd == 5:
+                days_back = 7
+            else:
+                days_back = (wd - 5) % 7
+            end_sat = today - timedelta(days=days_back)
 
-            print("No shared maps found or API call failed.")
-            return []
+        start_mon = end_sat - timedelta(days=5)
+        return start_mon, end_sat
 
-        except requests.RequestException as e:
-            print(f"Error fetching maps: {e}")
-            return []
+    # ----------------------------
+    # API calls
+    # ----------------------------
+    def get_all_maps(self):
+        urls_to_try = [
+            f"{self.base_url}/maps.json?type=private,shared",
+            f"{self.base_url}/maps.json?type=shared",
+            f"{self.base_url}/maps.json",
+        ]
+        for url in urls_to_try:
+            r = requests.get(url, headers=self.headers, timeout=60)
+            if r.status_code == 200:
+                data = r.json().get("data", [])
+                if data:
+                    return data
+        return []
 
     def get_map_layers(self, map_id):
-        """Get layers for a specific map"""
-        try:
-            url = f"{self.base_url}/maps/{map_id}/layers.json"
-            response = requests.get(url, headers=self.headers, timeout=60)
-
-            if response.status_code == 200:
-                data = response.json()
-                return data.get("data", [])
-            else:
-                print(f"Error fetching layers for map {map_id}: {response.status_code}")
-                return []
-
-        except requests.RequestException as e:
-            print(f"Error fetching layers: {e}")
+        url = f"{self.base_url}/maps/{map_id}/layers.json"
+        r = requests.get(url, headers=self.headers, timeout=60)
+        if r.status_code != 200:
             return []
+        return r.json().get("data", [])
 
     def get_layer_features(self, layer_id):
-        """Get ALL features from a layer (paged)"""
+        url = f"{self.base_url}/layers/{layer_id}/features.json"
+        params = {"perpage": 1000, "geometry": "false"}
+
+        all_features = []
+        page = 1
+        while True:
+            params["page"] = page
+            r = requests.get(url, headers=self.headers, params=params, timeout=60)
+            if r.status_code != 200:
+                break
+
+            batch = r.json().get("data", [])
+            if not batch:
+                break
+
+            all_features.extend(batch)
+            if len(batch) < 1000:
+                break
+            page += 1
+
+        return all_features
+
+    def get_layer_column_order(self, layer_id):
+        """
+        Use layer metadata to preserve a stable, sane column order (NOT random set-order).
+        """
         try:
-            url = f"{self.base_url}/layers/{layer_id}/features.json"
-            params = {"perpage": 1000, "geometry": "false"}
-
-            all_features = []
-            page = 1
-
-            while True:
-                params["page"] = page
-                response = requests.get(url, headers=self.headers, params=params, timeout=60)
-
-                if response.status_code != 200:
-                    print(f"Error downloading layer {layer_id}: {response.status_code}")
-                    return []
-
-                data = response.json()
-                features = data.get("data", [])
-
-                if not features:
-                    break
-
-                all_features.extend(features)
-
-                if len(features) < 1000:
-                    break
-
-                page += 1
-
-            return all_features
-
-        except Exception as e:
-            print(f"Error downloading layer {layer_id}: {e}")
+            url = f"{self.base_url}/layers/{layer_id}.json"
+            r = requests.get(url, headers=self.headers, params={"expand": "columns"}, timeout=60)
+            if r.status_code != 200:
+                return []
+            payload = r.json()
+            data = payload.get("data") if isinstance(payload, dict) else None
+            if not isinstance(data, dict):
+                return []
+            cols = data.get("columns", [])
+            ordered = []
+            for c in cols:
+                if isinstance(c, dict) and c.get("name"):
+                    ordered.append(str(c["name"]))
+            return ordered
+        except Exception:
             return []
 
     # ----------------------------
-    # Normalization rules (your requirements)
+    # Normalization helpers
     # ----------------------------
     def safe_name(self, s):
         s = (s or "").strip()
@@ -150,114 +174,198 @@ class GISCloudQCExporter:
         s = re.sub(r"\s+", " ", s).strip()
         return s if s else "Unnamed"
 
-    def parse_date_to_ymd(self, date_str):
-        """Parse dates like 7/25/2025 and normalize to YYYY-MM-DD string."""
-        if date_str is None:
+    def pick_first(self, d, candidates):
+        for k in candidates:
+            if k in d:
+                return d.get(k)
+        return None
+
+    def parse_date_to_iso(self, v):
+        if v is None:
             return None
-        if not isinstance(date_str, str):
-            date_str = str(date_str)
-        date_str = date_str.strip()
-        if not date_str:
+        s = str(v).strip()
+        if not s:
             return None
 
         # strip time if present
-        date_main = date_str.split("T")[0].split(" ")[0].strip()
+        s = s.split("T")[0].split(" ")[0].strip()
 
-        for fmt in ("%m/%d/%Y", "%m/%d/%y", "%Y-%m-%d", "%m-%d-%Y", "%Y/%m/%d"):
+        for fmt in ("%Y-%m-%d", "%m/%d/%Y", "%m/%d/%y", "%m-%d-%Y", "%Y/%m/%d"):
             try:
-                d = datetime.strptime(date_main, fmt).date()
-                return d.strftime("%Y-%m-%d")
+                return datetime.strptime(s, fmt).date().isoformat()
             except ValueError:
                 continue
         return None
 
-    def pick_first(self, data_dict, candidates):
-        for k in candidates:
-            if k in data_dict:
-                return data_dict.get(k, "")
-        return ""
+    def strip_internal(self, row: dict):
+        # remove any internal/system keys
+        return {k: v for k, v in row.items() if not str(k).startswith("__")}
 
-    def normalize_feature_row(self, feature):
+    def compute_stage(self, row: dict):
+        v = self.pick_first(row, self.stage_candidates)
+        return (str(v).strip() if v is not None else "")
+
+    def compute_date_iso(self, row: dict):
+        raw = self.pick_first(row, self.date_candidates)
+        return self.parse_date_to_iso(raw)
+
+    def in_week(self, iso_ymd: str, start: date, end: date):
+        if not iso_ymd:
+            return False
+        try:
+            d = datetime.strptime(iso_ymd, "%Y-%m-%d").date()
+        except ValueError:
+            return False
+        return start <= d <= end
+
+    def ordered_headers(self, rows: list, preferred_order: list):
         """
-        feature is a GISCloud feature dict:
-          { "data": { ...fields... } }
-        Returns normalized row dict (OUT schema) OR None if dropped.
+        Stable headers:
+          - ensure viewer-required columns exist and appear first (in that order)
+          - then preferred layer column order (metadata)
+          - then extras sorted
         """
-        data = feature.get("data", {}) if isinstance(feature, dict) else {}
-        if not isinstance(data, dict) or not data:
-            return None
+        keys = set()
+        for r in rows:
+            keys.update(self.strip_internal(r).keys())
 
-        stage_raw = (self.pick_first(data, self.stage_candidates) or "").strip()
-        stage_lc = stage_raw.lower().strip()
+        # Force required cols to exist in header (even if empty everywhere)
+        for c in self.viewer_required_cols:
+            keys.add(c)
 
-        # REQUIRED: lowercase stage before comparing to allowed list
-        if stage_lc not in self.allowed_stages:
-            return None
+        out = []
+        seen = set()
 
-        date_raw = self.pick_first(data, self.date_candidates)
-        date_norm = self.parse_date_to_ymd(date_raw)
-        if not date_norm:
-            return None
+        # required cols first
+        for c in self.viewer_required_cols:
+            if c in keys and c not in seen:
+                out.append(c)
+                seen.add(c)
 
-        cleared_by = (self.pick_first(data, self.cleared_by_candidates) or "").strip()
+        # then layer preferred order
+        for c in preferred_order:
+            if c in keys and not str(c).startswith("__") and c not in seen:
+                out.append(c)
+                seen.add(c)
 
-        # Only the columns you want
-        row = {
-            "stage": stage_raw,
-            "date_of_status_update": date_norm,
-            "district": (data.get("district", "") or "").strip(),
-            "address": (data.get("address", "") or "").strip(),
-            "street_dir": (data.get("street_dir", "") or "").strip(),
-            "street_name": (data.get("street_name", "") or "").strip(),
-            "city": (data.get("city", "") or "").strip(),
-            "cleared_by_employee": cleared_by,
-        }
-        return row
-
-    def normalize_and_sort(self, features):
-        rows = []
-        for f in features:
-            r = self.normalize_feature_row(f)
-            if r:
-                rows.append(r)
-
-        # REQUIRED: sort by these cols, in order:
-        # stage, date of status update, district, address, street dir, street name, city, cleared by employee
-        def k(r):
-            return (
-                (r.get("stage") or "").lower(),
-                r.get("date_of_status_update") or "",
-                (r.get("district") or "").lower(),
-                (r.get("address") or "").lower(),
-                (r.get("street_dir") or "").lower(),
-                (r.get("street_name") or "").lower(),
-                (r.get("city") or "").lower(),
-                (r.get("cleared_by_employee") or "").lower(),
-            )
-
-        rows.sort(key=k)
-        return rows
+        # then extras stable
+        extras = sorted([k for k in keys if k not in seen and not str(k).startswith("__")])
+        out.extend(extras)
+        return out
 
     # ----------------------------
-    # Output writers
+    # Photo validation (only)
     # ----------------------------
-    def write_csv(self, map_name, layer_name, rows):
-        self.out_dir.mkdir(parents=True, exist_ok=True)
+    def photo_column_names_for_layer(self, layer_name: str):
+        """
+        Match your validator behavior for line master files:
+          - default: photo_of_map, site_photo
+          - line master: photo_map, site_photos
+        """
+        ln = (layer_name or "").lower()
+        if "line master" in ln or "line_master" in ln:
+            return ("photo_map", "site_photos")
+        return ("photo_of_map", "site_photo")
 
-        safe_map = self.safe_name(map_name)
-        safe_layer = self.safe_name(layer_name)
+    def get_truck(self, row: dict):
+        v = self.pick_first(row, self.truck_candidates)
+        return (str(v).strip() if v is not None else "")
 
-        # filename contains map + layer (date range handled in UI; csv is "current snapshot")
-        filename = f"{safe_map}__{safe_layer}.csv"
-        path = self.out_dir / filename
+    def validate_photos_rows(self, rows: list, dataset_label: str, layer_name: str):
+        """
+        Returns list of error rows for the errors CSV.
+        Implements the logic you pasted (trimmed to what we need).
+        """
+        errors_out = []
+        map_col, site_col = self.photo_column_names_for_layer(layer_name)
+
+        for r in rows:
+            pv_stage_raw = str(r.get("pv_stage", "") or r.get("stage", "")).strip()
+            pv_stage = pv_stage_raw.upper()
+            jetting_ft = str(r.get("jet_ft", "")).strip()
+
+            if "cancel" in pv_stage_raw.lower() or "jetting" in pv_stage_raw.lower():
+                continue
+
+            if jetting_ft:
+                try:
+                    if float(jetting_ft) > 0:
+                        continue
+                except ValueError:
+                    pass
+
+            photo_of_map = str(r.get(map_col, "")).strip()
+            site_photo = str(r.get(site_col, "")).strip()
+
+            # We output a single normalized date column for errors
+            err_date = str(r.get("date_of_status_update", "")).strip()
+
+            truck = self.get_truck(r)
+            lead = str(r.get("crew_lead", "")).strip()
+            tech = str(r.get("crew_tech", "")).strip()
+
+            addr = str(r.get("address", "")).strip()
+            bldg = str(r.get("to_bldg", "")).strip()
+            sdir = str(r.get("street_dir", "")).strip()
+            sname = str(r.get("street_name", "")).strip()
+            city = str(r.get("city", "")).strip()
+
+            def push(msg: str, severity: str = "error"):
+                errors_out.append({
+                    "date": err_date,
+                    "truck": truck,
+                    "lead": lead,
+                    "tech": tech,
+                    "address": addr,
+                    "building": bldg,
+                    "street_dir": sdir,
+                    "street_name": sname,
+                    "city": city,
+                    "severity": severity,
+                    "error_message": msg,
+                    "map_photo_value": photo_of_map,
+                    "site_photo_value": site_photo,
+                    "map_photo_column": map_col,
+                    "site_photo_column": site_col,
+                    "dataset": dataset_label,
+                })
+
+            if pv_stage == "PRECON COMPLETE":
+                if not photo_of_map:
+                    push("PV stage is 'PRECON COMPLETE' but map photo is empty (required)", "error")
+                if not site_photo:
+                    push("PV stage is 'PRECON COMPLETE' but site photo MIGHT be missing (review: only required if gas crossing)", "review")
+
+            elif pv_stage == "COMPLETE":
+                if not photo_of_map:
+                    push("PV stage is 'COMPLETE' but map photo is empty (required)", "error")
+
+        return errors_out
+
+    # ----------------------------
+    # Writers
+    # ----------------------------
+    def write_main_csv(self, map_name, layer_name, layer_id, rows):
+        self.normalized_dir.mkdir(parents=True, exist_ok=True)
+
+        filename = f"{self.safe_name(map_name)}__{self.safe_name(layer_name)}.csv"
+        path = self.normalized_dir / filename
+
+        preferred_order = self.get_layer_column_order(layer_id)
+        headers = self.ordered_headers(rows, preferred_order)
 
         with path.open("w", newline="", encoding="utf-8") as f:
-            w = csv.DictWriter(f, fieldnames=self.out_columns, extrasaction="ignore")
+            w = csv.DictWriter(f, fieldnames=headers, extrasaction="ignore")
             w.writeheader()
             for r in rows:
-                w.writerow(r)
+                w.writerow(self.strip_internal(r))
 
-        dates = [r["date_of_status_update"] for r in rows if r.get("date_of_status_update")]
+        # min/max of normalized date column
+        dates = []
+        for r in rows:
+            d = str(r.get("date_of_status_update", "")).strip()
+            if d:
+                dates.append(d)
         min_date = min(dates) if dates else None
         max_date = max(dates) if dates else None
 
@@ -270,25 +378,64 @@ class GISCloudQCExporter:
             "max_date": max_date,
         }
 
-    def write_manifest(self, file_entries):
+    def write_photo_errors_csv(self, start: date, end: date, error_rows: list):
+        self.errors_dir.mkdir(parents=True, exist_ok=True)
+        fname = f"photo_errors_{start.isoformat()}_to_{end.isoformat()}.csv"
+        path = self.errors_dir / fname
+
+        headers = [
+            "date",
+            "truck",
+            "lead",
+            "tech",
+            "address",
+            "building",
+            "street_dir",
+            "street_name",
+            "city",
+            "severity",
+            "error_message",
+            "map_photo_value",
+            "site_photo_value",
+            "map_photo_column",
+            "site_photo_column",
+            "dataset",
+        ]
+
+        with path.open("w", newline="", encoding="utf-8") as f:
+            w = csv.DictWriter(f, fieldnames=headers, extrasaction="ignore")
+            w.writeheader()
+            for r in error_rows:
+                w.writerow(r)
+
+        return f"errors/{fname}".replace("\\", "/"), len(error_rows)
+
+    def write_manifest(self, file_entries: list, photo_errors_file: str, start: date, end: date):
         self.out_root.mkdir(parents=True, exist_ok=True)
         manifest = {
             "generated_at": datetime.now().isoformat(timespec="seconds"),
-            "columns": self.out_columns,
-            "files": sorted(file_entries, key=lambda x: (x.get("max_date") or "", x.get("file") or ""), reverse=True),
+            "week_window": {"start": start.isoformat(), "end": end.isoformat()},
+            "files": file_entries,
+            "photo_errors_file": photo_errors_file,
         }
         (self.out_root / "manifest.json").write_text(json.dumps(manifest, indent=2), encoding="utf-8")
 
     # ----------------------------
-    # Interactive selection (kept like your script)
+    # Main
     # ----------------------------
-    def interactive_select(self):
-        maps = self.get_shared_maps()
+    def run(self):
+        if not self.api_key:
+            raise RuntimeError("Missing GIS_API_KEY environment variable.")
+
+        start, end = self.previous_week_monday_to_saturday()
+        print(f"Weekly window: {start.isoformat()} → {end.isoformat()}")
+
+        maps = self.get_all_maps()
         if not maps:
             print("No maps available.")
             return
 
-        # Filter maps by your keywords
+        # Filter maps by keywords (your original behavior)
         maps = [m for m in maps if any(k.lower() in (m.get("name") or "").lower() for k in self.keywords)]
         if not maps:
             print("No maps matched keywords:", ", ".join(self.keywords))
@@ -306,78 +453,84 @@ class GISCloudQCExporter:
             selected_indices = [int(x.strip()) - 1 for x in selected.split(",") if x.strip().isdigit()]
             selected_maps = [maps[i] for i in selected_indices if 0 <= i < len(maps)]
 
-        if not selected_maps:
-            print("Nothing selected.")
-            return
-
         file_entries = []
+        photo_error_rows = []
 
         for map_data in selected_maps:
             raw_map_id = map_data.get("id")
             map_id = str(raw_map_id)
             map_name = map_data.get("name", f"Map_{map_id}")
 
-            print(f"\nFetching layers for: {map_name} (ID: {map_id})")
+            layer_ids = self.auto_layers.get(map_id, [])
+            if not layer_ids:
+                continue
 
-            # Pick layer
-            if map_id in self.auto_layers:
-                layer_id = str(self.auto_layers[map_id])
-                print(f"Auto-selected layer ID: {layer_id}")
-            else:
-                print(f"⚠ No predefined layer for {map_name} — please select one:")
-                layers = self.get_map_layers(raw_map_id)
-                if not layers:
-                    print(f"No layers found for {map_name}, skipping.")
+            layers = self.get_map_layers(raw_map_id)
+            if not layers:
+                continue
+
+            for layer_id in layer_ids:
+                layer = next((l for l in layers if str(l.get("id")) == str(layer_id)), None)
+                if not layer:
                     continue
 
-                for i, layer in enumerate(layers, 1):
-                    print(f"{i}. {layer.get('name', 'Unnamed Layer')} (ID: {layer.get('id')})")
+                layer_name = layer.get("name", f"Layer_{layer_id}")
+                dataset_label = f"{map_name} — {layer_name}"
 
-                while True:
-                    choice = input("Enter layer number: ").strip()
-                    if choice.isdigit() and 1 <= int(choice) <= len(layers):
-                        layer_id = str(layers[int(choice) - 1].get("id"))
-                        break
-                    print("Invalid choice. Please enter a valid layer number.")
+                # Keep these commented selection lines as requested:
+                # print(f"\nMap: {map_name} (ID: {map_id})")
+                # for i, lyr in enumerate(layers, 1):
+                #     print(f"{i}. {lyr.get('name', 'Unnamed Layer')} (ID: {lyr.get('id')})")
+                # choice = input("Enter layer number(s) (comma separated) or 'all': ").strip()
 
-            # Resolve layer name for that ID
-            layers = self.get_map_layers(raw_map_id)
-            layer = next((l for l in layers if str(l.get("id")) == str(layer_id)), None)
-            if not layer:
-                print(f"Layer {layer_id} not found for {map_name}")
-                continue
+                print(f"Downloading: {dataset_label} (layer_id={layer_id})")
 
-            layer_name = layer.get("name", f"Layer_{layer_id}")
-            print(f"Selected Layer: {layer_name} (ID: {layer_id})")
+                features = self.get_layer_features(str(layer_id))
+                if not features:
+                    print("  No features returned.")
+                    continue
 
-            features = self.get_layer_features(layer_id)
-            if not features:
-                print("No data found or error downloading.")
-                continue
+                rows = []
+                for f in features:
+                    data = f.get("data") if isinstance(f, dict) else None
+                    if not isinstance(data, dict) or not data:
+                        continue
 
-            rows = self.normalize_and_sort(features)
+                    # keep everything (minus internal)
+                    row = self.strip_internal(data)
 
-            print(f"Downloaded {len(features)} features; kept {len(rows)} rows after stage/date filtering.")
-            entry = self.write_csv(map_name, layer_name, rows)
-            file_entries.append(entry)
-            print(f"Wrote: {self.out_dir / Path(entry['file']).name}")
+                    # ensure viewer-required columns exist (populate if possible)
+                    stage = self.compute_stage(row)
+                    date_iso = self.compute_date_iso(row)
 
-        if file_entries:
-            self.write_manifest(file_entries)
-            print(f"\nWrote manifest: {self.out_root / 'manifest.json'}")
-            print("Done.")
-        else:
-            print("\nNo files written (no data matched filters).")
+                    row["stage"] = stage
+                    row["date_of_status_update"] = date_iso or ""
+
+                    rows.append(row)
+
+                # weekly filter
+                rows_week = [r for r in rows if self.in_week(r.get("date_of_status_update", ""), start, end)]
+                print(f"  Features: {len(features)} | Rows kept (weekly): {len(rows_week)}")
+
+                if not rows_week:
+                    continue
+
+                entry = self.write_main_csv(map_name, layer_name, str(layer_id), rows_week)
+                file_entries.append(entry)
+
+                # photo validation errors (only)
+                photo_error_rows.extend(self.validate_photos_rows(rows_week, dataset_label, layer_name))
+
+        # write photo errors CSV (even if empty, write it so UI has a stable path)
+        photo_errors_file, photo_err_count = self.write_photo_errors_csv(start, end, photo_error_rows)
+        print(f"Photo errors: {photo_err_count} -> {photo_errors_file}")
+
+        # write manifest
+        self.write_manifest(file_entries, photo_errors_file, start, end)
+        print(f"Wrote manifest: {self.out_root / 'manifest.json'}")
+        print("Done.")
 
 
 if __name__ == "__main__":
-    api_key = os.getenv("GIS_API_KEY", "").strip()
-
-    exporter = GISCloudQCExporter(api_key, out_root="data")
-
-    try:
-        exporter.interactive_select()
-    except KeyboardInterrupt:
-        print("\nOperation cancelled by user")
-    except Exception as e:
-        print(f"An error occurred: {e}")
+    api_key = os.getenv("GIS_API_KEY", "")
+    GISCloudWeeklyExporter(api_key, out_root="data").run()

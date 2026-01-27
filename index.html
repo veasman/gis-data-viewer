@@ -82,7 +82,12 @@
             border: 1px solid rgba(255, 255, 255, .10);
             background: rgba(255, 255, 255, .05);
             color: var(--text);
-            font-size: 12px
+            font-size: 12px;
+            text-decoration: none;
+        }
+
+        .chip:hover {
+            border-color: rgba(120, 170, 255, .35)
         }
 
         .controls {
@@ -169,6 +174,28 @@
             gap: 14px
         }
 
+        .section-head {
+            display: flex;
+            align-items: baseline;
+            justify-content: space-between;
+            gap: 12px;
+            padding: 18px 14px 8px;
+            border-top: 1px solid var(--border);
+            margin-top: 18px;
+        }
+
+        .section-head h2 {
+            margin: 0;
+            font-size: 14px;
+            font-weight: 800;
+        }
+
+        .section-head .hint {
+            color: var(--muted);
+            font-size: 12px;
+            margin-top: 2px;
+        }
+
         .table-card {
             border: 1px solid var(--border);
             border-radius: var(--radius);
@@ -223,7 +250,6 @@
             font-variant-numeric: tabular-nums
         }
 
-        /* Fixes “first row tucked under sticky header” */
         .table-scroll {
             overflow: auto;
             border-radius: 0 0 var(--radius) var(--radius);
@@ -279,7 +305,10 @@
         <div class="topbar">
             <div class="brand">
                 <h1>GIS Data Viewer</h1>
-                <div class="sub">Filtered to stages: complete, precon complete, po, strike</div>
+                <div class="sub">Main view uses normalized columns; photo checks are listed below.</div>
+            </div>
+            <div style="display:flex; gap:10px; align-items:center; flex-wrap:wrap;">
+                <a class="chip" href="#photoErrors" id="photoChip">Photo errors: …</a>
             </div>
         </div>
 
@@ -307,6 +336,19 @@
 
         <div class="summary" id="summary"></div>
         <div class="tables" id="tables"></div>
+
+        <div class="section-head" id="photoErrors">
+            <div>
+                <h2>Photo Errors</h2>
+                <div class="hint">Missing required map/site photos based on PV stage rules (photo validator).</div>
+            </div>
+            <div class="field" style="min-width:320px; max-width:480px; width:100%;">
+                <label for="errorSearch">Search errors (message, address, truck, dataset)</label>
+                <input id="errorSearch" type="text" placeholder="type to filter photo errors..." />
+            </div>
+        </div>
+
+        <div class="tables" id="errorTables"></div>
     </div>
 
     <script>
@@ -323,22 +365,53 @@
             "cleared_by_employee"
         ];
 
+        const ERROR_COLS = [
+            "date",
+            "truck",
+            "lead",
+            "tech",
+            "address",
+            "building",
+            "street_dir",
+            "street_name",
+            "city",
+            "severity",
+            "error_message",
+            "dataset"
+        ];
+
         const MANIFEST_PATH = "data/manifest.json";
         const CSV_BASE_DIR = "data/";
 
         function pad2(n) { return String(n).padStart(2, "0"); }
         function toISODate(d) { return `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}`; }
 
+        // Default range = previous Mon..Sat. If today is Sunday, use week that just ended.
         function defaultRange() {
             const now = new Date();
-            const day = now.getDay();
-            if (day === 1) {
-                const fri = new Date(now); fri.setDate(now.getDate() - 3);
-                const sat = new Date(now); sat.setDate(now.getDate() - 2);
-                return { start: toISODate(fri), end: toISODate(sat) };
+            const wd = now.getDay(); // Sun=0, Mon=1 ... Sat=6
+
+            // convert to Mon=0..Sun=6 like python
+            const pyWd = (wd === 0) ? 6 : (wd - 1);
+
+            let endSat;
+            if (pyWd === 6) {
+                // Sunday -> end = yesterday (Saturday)
+                endSat = new Date(now);
+                endSat.setDate(now.getDate() - 1);
+            } else {
+                // previous Saturday strictly before today; if today is Saturday, go back 7
+                let daysBack;
+                if (pyWd === 5) daysBack = 7;
+                else daysBack = (pyWd - 5 + 7) % 7;
+                endSat = new Date(now);
+                endSat.setDate(now.getDate() - daysBack);
             }
-            const y = new Date(now); y.setDate(now.getDate() - 1);
-            return { start: toISODate(y), end: toISODate(y) };
+
+            const startMon = new Date(endSat);
+            startMon.setDate(endSat.getDate() - 5);
+
+            return { start: toISODate(startMon), end: toISODate(endSat) };
         }
 
         function parseDateLoose(s) {
@@ -346,7 +419,6 @@
             const str = String(s).trim();
             if (!str) return null;
 
-            // normalized outputs should already be ISO YYYY-MM-DD
             if (/^\d{4}-\d{2}-\d{2}$/.test(str)) return str;
 
             let m = str.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
@@ -394,15 +466,14 @@
             return { headers, data };
         }
 
-        function headersMatchNormalized(headers) {
+        function headersContainRequired(headers, requiredCols) {
             const set = new Set(headers.map(h => String(h || "").trim()));
-            for (const c of COLS) {
+            for (const c of requiredCols) {
                 if (!set.has(c)) return false;
             }
             return true;
         }
 
-        // IMPORTANT: if file is already normalized, do NOT try to guess alternate column names.
         function normalizeRows(headers, data) {
             const idx = new Map();
             headers.forEach((h, j) => idx.set(h, j));
@@ -461,6 +532,26 @@
             return hay.includes(s);
         }
 
+        function errorMatch(row, q) {
+            if (!q) return true;
+            const s = q.toLowerCase();
+            const hay = [
+                row.date,
+                row.truck,
+                row.lead,
+                row.tech,
+                row.address,
+                row.building,
+                row.street_dir,
+                row.street_name,
+                row.city,
+                row.severity,
+                row.error_message,
+                row.dataset
+            ].join(" ").toLowerCase();
+            return hay.includes(s);
+        }
+
         function el(tag, attrs = {}, children = []) {
             const e = document.createElement(tag);
             for (const [k, v] of Object.entries(attrs)) {
@@ -481,7 +572,7 @@
             if (!p) return null;
             if (p.startsWith("data/")) return p;
             if (p.startsWith("./")) p = p.slice(2);
-            return CSV_BASE_DIR + p; // data/normalized/...
+            return CSV_BASE_DIR + p;
         }
 
         async function loadManifest() {
@@ -554,6 +645,45 @@
             return card;
         }
 
+        function renderErrorsCard(titleLabel, filePath, rows) {
+            const card = el("div", { class: "table-card" });
+            const head = el("div", { class: "card-head" });
+            const title = el("div", { class: "card-title" }, [
+                el("div", { class: "name", text: titleLabel }),
+                el("div", { class: "meta", text: filePath || "(missing errors file path)" })
+            ]);
+            const pill = el("div", { class: "pill rowcount", text: `${rows.length} issue${rows.length === 1 ? "" : "s"}` });
+            head.appendChild(title);
+            head.appendChild(pill);
+            card.appendChild(head);
+
+            if (!rows.length) {
+                card.appendChild(el("div", { class: "empty", text: "No photo issues found for the selected date range." }));
+                return card;
+            }
+
+            const scroll = el("div", { class: "table-scroll" });
+            const table = el("table");
+
+            const thead = el("thead");
+            const trh = el("tr");
+            for (const c of ERROR_COLS) trh.appendChild(el("th", { text: c }));
+            thead.appendChild(trh);
+
+            const tbody = el("tbody");
+            for (const r of rows) {
+                const tr = el("tr");
+                for (const c of ERROR_COLS) tr.appendChild(el("td", { text: r[c] ?? "" }));
+                tbody.appendChild(tr);
+            }
+
+            table.appendChild(thead);
+            table.appendChild(tbody);
+            scroll.appendChild(table);
+            card.appendChild(scroll);
+            return card;
+        }
+
         function sortFilesNewestFirst(files) {
             function dateFromPath(p) {
                 const m = String(p || "").match(/(\d{4}-\d{2}-\d{2})/);
@@ -567,14 +697,45 @@
             });
         }
 
+        function parseErrors(headers, data) {
+            const idx = new Map();
+            headers.forEach((h, j) => idx.set(h, j));
+            const get = (row, col) => {
+                const j = idx.get(col);
+                if (j === undefined) return "";
+                return row[j] ?? "";
+            };
+
+            const out = [];
+            for (const r of data) {
+                const obj = {};
+                for (const c of ERROR_COLS) obj[c] = String(get(r, c) || "").trim();
+                // normalize date
+                obj.date = parseDateLoose(obj.date) || obj.date;
+                out.push(obj);
+            }
+
+            out.sort((a, b) => {
+                const da = a.date || "";
+                const db = b.date || "";
+                if (da !== db) return db.localeCompare(da);
+                return String(a.dataset || "").localeCompare(String(b.dataset || ""));
+            });
+
+            return out;
+        }
+
         async function apply() {
             const start = document.getElementById("startDate").value;
             const end = document.getElementById("endDate").value;
             const q = document.getElementById("search").value.trim();
+            const eq = document.getElementById("errorSearch").value.trim();
 
             const summary = document.getElementById("summary");
             const tables = document.getElementById("tables");
+            const errorTables = document.getElementById("errorTables");
             tables.innerHTML = "";
+            errorTables.innerHTML = "";
 
             if (!start || !end) { summary.textContent = "Pick a start and end date."; return; }
             if (start > end) { summary.textContent = "Start date cannot be after end date."; return; }
@@ -596,19 +757,7 @@
             for (const f of files) {
                 const csvPath = resolveCSVPath(f.file);
 
-                if (!csvPath) {
-                    const card = el("div", { class: "table-card" });
-                    card.appendChild(el("div", { class: "card-head" }, [
-                        el("div", { class: "card-title" }, [
-                            el("div", { class: "name", text: f.label || "Bad manifest entry" }),
-                            el("div", { class: "meta", text: "Manifest entry is missing a file/path field." })
-                        ]),
-                        el("div", { class: "pill", text: "error" })
-                    ]));
-                    card.appendChild(el("div", { class: "empty", text: "Fix data/manifest.json: each entry must include a file path." }));
-                    tables.appendChild(card);
-                    continue;
-                }
+                if (!csvPath) continue;
 
                 let text;
                 try {
@@ -629,8 +778,7 @@
 
                 const parsed = csvParse(text);
 
-                // If headers don't match normalized schema, show a loud error instead of silently returning 0.
-                if (!headersMatchNormalized(parsed.headers)) {
+                if (!headersContainRequired(parsed.headers, COLS)) {
                     const card = el("div", { class: "table-card" });
                     card.appendChild(el("div", { class: "card-head" }, [
                         el("div", { class: "card-title" }, [
@@ -641,7 +789,7 @@
                     ]));
                     card.appendChild(el("div", {
                         class: "empty", text:
-                            `CSV headers do not match expected normalized schema.\nExpected: ${COLS.join(", ")}\nGot: ${parsed.headers.join(", ")}`
+                            `CSV is missing required columns for the main viewer.\nRequired: ${COLS.join(", ")}\nGot: ${parsed.headers.join(", ")}`
                     }));
                     tables.appendChild(card);
                     continue;
@@ -660,6 +808,70 @@
 
             summary.textContent =
                 `Showing ${shownTables} table${shownTables === 1 ? "" : "s"} (${totalRows} row${totalRows === 1 ? "" : "s"}) for ${start} → ${end}.`;
+
+            // ---- Photo errors section ----
+            const chip = document.getElementById("photoChip");
+            let photoPath = manifest.photo_errors_file;
+            photoPath = resolveCSVPath(photoPath);
+
+            if (!photoPath) {
+                chip.textContent = "Photo errors: (missing)";
+                const card = el("div", { class: "table-card" });
+                card.appendChild(el("div", { class: "card-head" }, [
+                    el("div", { class: "card-title" }, [
+                        el("div", { class: "name", text: "Photo Errors" }),
+                        el("div", { class: "meta", text: "manifest.json is missing photo_errors_file" })
+                    ]),
+                    el("div", { class: "pill", text: "error" })
+                ]));
+                card.appendChild(el("div", { class: "empty", text: "Fix run.py to write manifest.photo_errors_file." }));
+                errorTables.appendChild(card);
+                return;
+            }
+
+            try {
+                const txt = await loadCSV(photoPath);
+                const parsed = csvParse(txt);
+
+                if (!headersContainRequired(parsed.headers, ERROR_COLS)) {
+                    chip.textContent = "Photo errors: (bad csv)";
+                    const card = el("div", { class: "table-card" });
+                    card.appendChild(el("div", { class: "card-head" }, [
+                        el("div", { class: "card-title" }, [
+                            el("div", { class: "name", text: "Photo Errors" }),
+                            el("div", { class: "meta", text: photoPath })
+                        ]),
+                        el("div", { class: "pill", text: "error" })
+                    ]));
+                    card.appendChild(el("div", {
+                        class: "empty", text:
+                            `Photo errors CSV missing required columns.\nRequired: ${ERROR_COLS.join(", ")}\nGot: ${parsed.headers.join(", ")}`
+                    }));
+                    errorTables.appendChild(card);
+                    return;
+                }
+
+                const errors = parseErrors(parsed.headers, parsed.data)
+                    .filter(r => inRange(r.date, start, end))
+                    .filter(r => errorMatch(r, eq));
+
+                chip.textContent = `Photo errors: ${errors.length}`;
+
+                errorTables.appendChild(renderErrorsCard("Photo Errors", photoPath, errors));
+
+            } catch (err) {
+                chip.textContent = "Photo errors: (load failed)";
+                const card = el("div", { class: "table-card" });
+                card.appendChild(el("div", { class: "card-head" }, [
+                    el("div", { class: "card-title" }, [
+                        el("div", { class: "name", text: "Photo Errors" }),
+                        el("div", { class: "meta", text: photoPath })
+                    ]),
+                    el("div", { class: "pill", text: "error" })
+                ]));
+                card.appendChild(el("div", { class: "empty", text: err.message }));
+                errorTables.appendChild(card);
+            }
         }
 
         (function init() {
@@ -671,15 +883,22 @@
                 const d2 = defaultRange();
                 document.getElementById("startDate").value = d2.start;
                 document.getElementById("endDate").value = d2.end;
+                apply();
             });
 
             document.getElementById("applyBtn").addEventListener("click", apply);
+
             document.getElementById("search").addEventListener("keydown", (e) => {
+                if (e.key === "Enter") apply();
+            });
+
+            document.getElementById("errorSearch").addEventListener("keydown", (e) => {
                 if (e.key === "Enter") apply();
             });
 
             document.getElementById("clearBtn").addEventListener("click", () => {
                 document.getElementById("search").value = "";
+                document.getElementById("errorSearch").value = "";
                 apply();
             });
 

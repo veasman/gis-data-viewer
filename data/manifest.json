@@ -1,63 +1,42 @@
 {
-  "generated_at": "2026-01-27T08:39:36",
-  "columns": [
-    "stage",
-    "date_of_status_update",
-    "district",
-    "address",
-    "street_dir",
-    "street_name",
-    "city",
-    "cleared_by_employee"
-  ],
+  "generated_at": "2026-01-27T10:01:06",
+  "week_window": {
+    "start": "2026-01-19",
+    "end": "2026-01-24"
+  },
   "files": [
-    {
-      "file": "normalized/ATMOS CO__Master ATMOS CO 2023.csv",
-      "map_name": "ATMOS CO",
-      "layer_name": "Master ATMOS CO 2023",
-      "row_count": 8435,
-      "min_date": "1993-10-03",
-      "max_date": "2026-01-26"
-    },
     {
       "file": "normalized/PRECON_Master__Precon 2022.csv",
       "map_name": "PRECON_Master",
       "layer_name": "Precon 2022",
-      "row_count": 5187,
-      "min_date": "1956-12-03",
+      "row_count": 12,
+      "min_date": "2026-01-21",
+      "max_date": "2026-01-23"
+    },
+    {
+      "file": "normalized/ATMOS KS__Master ATMOS KS 2023.csv",
+      "map_name": "ATMOS KS",
+      "layer_name": "Master ATMOS KS 2023",
+      "row_count": 49,
+      "min_date": "2026-01-19",
+      "max_date": "2026-01-22"
+    },
+    {
+      "file": "normalized/ATMOS CO__Master ATMOS CO 2023.csv",
+      "map_name": "ATMOS CO",
+      "layer_name": "Master ATMOS CO 2023",
+      "row_count": 37,
+      "min_date": "2026-01-20",
       "max_date": "2026-01-23"
     },
     {
       "file": "normalized/One Gas__One Gas 2024.csv",
       "map_name": "One Gas",
       "layer_name": "One Gas 2024",
-      "row_count": 1157,
-      "min_date": "2024-04-29",
+      "row_count": 12,
+      "min_date": "2026-01-21",
       "max_date": "2026-01-22"
-    },
-    {
-      "file": "normalized/ATMOS KS__Master ATMOS KS 2023.csv",
-      "map_name": "ATMOS KS",
-      "layer_name": "Master ATMOS KS 2023",
-      "row_count": 13229,
-      "min_date": "2003-05-04",
-      "max_date": "2026-01-22"
-    },
-    {
-      "file": "normalized/ATMOS Colorado 2025__Colorado_Line_Master_2025.csv",
-      "map_name": "ATMOS Colorado 2025",
-      "layer_name": "Colorado_Line_Master_2025",
-      "row_count": 19,
-      "min_date": "2025-05-13",
-      "max_date": "2026-01-07"
-    },
-    {
-      "file": "normalized/ATMOS Kansas 2025__Kansas_Line_Master_2025.csv",
-      "map_name": "ATMOS Kansas 2025",
-      "layer_name": "Kansas_Line_Master_2025",
-      "row_count": 22,
-      "min_date": "2025-09-15",
-      "max_date": "2025-09-24"
     }
-  ]
+  ],
+  "photo_errors_file": "errors/photo_errors_2026-01-19_to_2026-01-24.csv"
 }
