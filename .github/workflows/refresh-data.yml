@@ -1,43 +1,44 @@
-name: run main.py
+name: Automated data refresh
 
 on:
   schedule:
-    - cron: '0 4 * * *'
+    - cron: "0 4 * * *"
+  workflow_dispatch:
 
 permissions:
   contents: write
 
 jobs:
-  build:
+  refresh:
     runs-on: ubuntu-latest
     steps:
-      - name: checkout repo content
+      - name: Checkout
         uses: actions/checkout@v4
         with:
           persist-credentials: true
 
-      - name: setup python
+      - name: Setup Python
         uses: actions/setup-python@v5
         with:
-          python-version: '3.13'
+          python-version: "3.13"
 
-      - name: install python packages
+      - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
           pip install -r requirements.txt
 
-      - name: execute python script
+      - name: Run refresh script
         env:
           GIS_API_KEY: ${{ secrets.GIS_API_KEY }}
         run: python run.py
 
-      - name: commit files
+      - name: Commit changes (if any)
         run: |
           git config user.email "action@github.com"
           git config user.name "GitHub Action"
           git add -A
           git diff --cached --quiet || git commit -m "automated data refresh"
 
-      - name: push changes
+      - name: Push changes
         run: |
           git push origin master
