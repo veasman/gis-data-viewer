@@ -2,40 +2,42 @@ name: run main.py
 
 on:
   schedule:
-    - cron: '0 4 * * *' 
+    - cron: '0 4 * * *'
+
+permissions:
+  contents: write
 
 jobs:
   build:
     runs-on: ubuntu-latest
     steps:
-
       - name: checkout repo content
-        uses: actions/checkout@v2
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: true
 
       - name: setup python
-        uses: actions/setup-python@v4
+        uses: actions/setup-python@v5
         with:
-          python-version: '3.13.9'
-          
+          python-version: '3.13'
+
       - name: install python packages
         run: |
           python -m pip install --upgrade pip
           pip install -r requirements.txt
-          
+
       - name: execute python script
         env:
           GIS_API_KEY: ${{ secrets.GIS_API_KEY }}
         run: python run.py
-          
+
       - name: commit files
         run: |
-          git config --local user.email "action@github.com"
-          git config --local user.name "GitHub Action"
+          git config user.email "action@github.com"
+          git config user.name "GitHub Action"
           git add -A
-          git diff-index --quiet HEAD || (git commit -a -m "automated data refresh" --allow-empty)
-          
+          git diff --cached --quiet || git commit -m "automated data refresh"
+
       - name: push changes
-        uses: ad-m/github-push-action@v0.6.0
-        with:
-          github_token: ${{ secrets.GH_TOKEN }}
-          branch: master 
+        run: |
+          git push origin master

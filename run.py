@@ -508,18 +508,26 @@ class GISCloudWeeklyExporter:
 
                     rows.append(row)
 
-                # weekly filter
-                rows_week = [r for r in rows if self.in_week(r.get("date_of_status_update", ""), start, end)]
-                print(f"  Features: {len(features)} | Rows kept (weekly): {len(rows_week)}")
+                # KEEP ALL HISTORY (no date restriction for main CSV)
+                rows_all = rows
 
-                if not rows_week:
+                # Useful logging (how many rows have a usable normalized date?)
+                dated = [r for r in rows_all if str(r.get("date_of_status_update", "")).strip()]
+                min_date = min((r["date_of_status_update"] for r in dated), default=None)
+                max_date = max((r["date_of_status_update"] for r in dated), default=None)
+
+                print(f"  Features: {len(features)} | Rows kept (all): {len(rows_all)} | Date span: {min_date} → {max_date}")
+
+                if not rows_all:
                     continue
 
-                entry = self.write_main_csv(map_name, layer_name, str(layer_id), rows_week)
+                entry = self.write_main_csv(map_name, layer_name, str(layer_id), rows_all)
                 file_entries.append(entry)
 
-                # photo validation errors (only)
-                photo_error_rows.extend(self.validate_photos_rows(rows_week, dataset_label, layer_name))
+                # Photo validation errors: you have a choice.
+                # Option A (recommended): validate only the selected window to keep the errors list focused.
+                rows_window = [r for r in rows_all if self.in_week(r.get("date_of_status_update", ""), start, end)]
+                photo_error_rows.extend(self.validate_photos_rows(rows_window, dataset_label, layer_name))
 
         # write photo errors CSV (even if empty, write it so UI has a stable path)
         photo_errors_file, photo_err_count = self.write_photo_errors_csv(start, end, photo_error_rows)
