@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-01-27T10:01:06",
+  "generated_at": "2026-01-28T08:41:46",
   "week_window": {
     "start": "2026-01-19",
     "end": "2026-01-24"
@@ -17,7 +17,7 @@
       "file": "normalized/ATMOS KS__Master ATMOS KS 2023.csv",
       "map_name": "ATMOS KS",
       "layer_name": "Master ATMOS KS 2023",
-      "row_count": 49,
+      "row_count": 50,
       "min_date": "2026-01-19",
       "max_date": "2026-01-22"
     },
