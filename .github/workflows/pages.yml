@@ -1,8 +1,16 @@
 name: Deploy static content to Pages
 
 on:
+  # Keep this if you still want Pages to deploy on human pushes
   push:
     branches: ["master"]
+
+  # This is the important part: deploy after the refresh workflow completes
+  workflow_run:
+    workflows: ["Automated data refresh"]
+    types:
+      - completed
+
   workflow_dispatch:
 
 permissions:
@@ -16,13 +24,23 @@ concurrency:
 
 jobs:
   deploy:
+    # Only deploy when refresh-data succeeds (workflow_run only)
+    if: ${{ github.event_name != 'workflow_run' || github.event.workflow_run.conclusion == 'success' }}
+
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
+
     runs-on: ubuntu-latest
+
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          # Critical: when triggered by workflow_run, do NOT checkout the workflow_run SHA
+          # because refresh-data created a newer commit after it started.
+          # Always deploy the latest master.
+          ref: master
 
       - name: Setup Pages
         uses: actions/configure-pages@v5
