@@ -256,14 +256,12 @@ class GISCloudWeeklyExporter:
     # ----------------------------
     # Photo validation (only)
     # ----------------------------
-    def photo_column_names_for_layer(self, layer_name: str):
+    def photo_column_names_for_layer(self, layer_id: str):
         """
-        Match your validator behavior for line master files:
-          - default: photo_of_map, site_photo
-          - line master: photo_map, site_photos
+        Default: photo_of_map, site_photo
+        One Gas Line Master 2025 (layer 6728851): photo_map, site_photos
         """
-        ln = (layer_name or "").lower()
-        if "line master" in ln or "line_master" in ln:
+        if str(layer_id) == "6728851":
             return ("photo_map", "site_photos")
         return ("photo_of_map", "site_photo")
 
@@ -271,74 +269,105 @@ class GISCloudWeeklyExporter:
         v = self.pick_first(row, self.truck_candidates)
         return (str(v).strip() if v is not None else "")
 
-    def validate_photos_rows(self, rows: list, dataset_label: str, layer_name: str):
+    def _norm_stage_key(self, s: str) -> str:
         """
-        Returns list of error rows for the errors CSV.
-        Implements the logic you pasted (trimmed to what we need).
+        Normalize stage strings so PRECON_COMPLETE == PRECON COMPLETE.
+        Also collapses extra whitespace.
         """
+        raw = (s or "").strip().upper()
+        raw = raw.replace("_", " ")
+        raw = re.sub(r"\s+", " ", raw).strip()
+        return raw
+
+    def validate_photos_rows(
+        self,
+        rows: list,
+        dataset_label: str,
+        layer_id: str,
+        start: date,
+        end: date,
+    ):
         errors_out = []
-        map_col, site_col = self.photo_column_names_for_layer(layer_name)
+
+        map_col, site_col = self.photo_column_names_for_layer(layer_id)
 
         for r in rows:
-            pv_stage_raw = str(r.get("pv_stage", "") or r.get("stage", "")).strip()
-            pv_stage = pv_stage_raw.upper()
-            jetting_ft = str(r.get("jet_ft", "")).strip()
-
-            if "cancel" in pv_stage_raw.lower() or "jetting" in pv_stage_raw.lower():
+            # ------------------------
+            # Date filter (CURRENT WEEK ONLY)
+            # ------------------------
+            iso_date = str(r.get("date_of_status_update", "")).strip()
+            if not self.in_week(iso_date, start, end):
                 continue
 
-            if jetting_ft:
+            # ------------------------
+            # Ignore jetting rows
+            # ------------------------
+            pv_stage_raw = str(r.get("pv_stage", "")).strip().lower()
+            if "jetting" in pv_stage_raw:
+                continue
+
+            jet_ft = str(r.get("jet_ft", "")).strip()
+            if jet_ft:
                 try:
-                    if float(jetting_ft) > 0:
+                    if float(jet_ft) > 0:
                         continue
                 except ValueError:
                     pass
 
-            photo_of_map = str(r.get(map_col, "")).strip()
+            # ------------------------
+            # Stage
+            # ------------------------
+            stage = str(r.get("stage", "")).strip().upper()
+            if not stage:
+                continue
+
+            # ------------------------
+            # Photos
+            # ------------------------
+            map_photo = str(r.get(map_col, "")).strip()
             site_photo = str(r.get(site_col, "")).strip()
 
-            # We output a single normalized date column for errors
-            err_date = str(r.get("date_of_status_update", "")).strip()
-
-            truck = self.get_truck(r)
-            lead = str(r.get("crew_lead", "")).strip()
-            tech = str(r.get("crew_tech", "")).strip()
-
-            addr = str(r.get("address", "")).strip()
-            bldg = str(r.get("to_bldg", "")).strip()
-            sdir = str(r.get("street_dir", "")).strip()
-            sname = str(r.get("street_name", "")).strip()
-            city = str(r.get("city", "")).strip()
-
-            def push(msg: str, severity: str = "error"):
+            def push(msg: str, severity: str):
                 errors_out.append({
-                    "date": err_date,
-                    "truck": truck,
-                    "lead": lead,
-                    "tech": tech,
-                    "address": addr,
-                    "building": bldg,
-                    "street_dir": sdir,
-                    "street_name": sname,
-                    "city": city,
+                    "date": iso_date,
+                    "truck": self.get_truck(r),
+                    "lead": str(r.get("crew_lead", "")).strip(),
+                    "tech": str(r.get("crew_tech", "")).strip(),
+                    "address": str(r.get("address", "")).strip(),
+                    "building": str(r.get("to_bldg", "")).strip(),
+                    "street_dir": str(r.get("street_dir", "")).strip(),
+                    "street_name": str(r.get("street_name", "")).strip(),
+                    "city": str(r.get("city", "")).strip(),
                     "severity": severity,
                     "error_message": msg,
-                    "map_photo_value": photo_of_map,
+                    "map_photo_value": map_photo,
                     "site_photo_value": site_photo,
                     "map_photo_column": map_col,
                     "site_photo_column": site_col,
                     "dataset": dataset_label,
                 })
 
-            if pv_stage == "PRECON COMPLETE":
-                if not photo_of_map:
-                    push("PV stage is 'PRECON COMPLETE' but map photo is empty (required)", "error")
-                if not site_photo:
-                    push("PV stage is 'PRECON COMPLETE' but site photo MIGHT be missing (review: only required if gas crossing)", "review")
+            # ------------------------
+            # VALIDATION RULES
+            # ------------------------
+            if stage == "PRECON COMPLETE":
+                if map_photo == 'None' or not map_photo:
+                    push(
+                        "PRECON COMPLETE but map photo is missing",
+                        "error",
+                    )
 
-            elif pv_stage == "COMPLETE":
-                if not photo_of_map:
-                    push("PV stage is 'COMPLETE' but map photo is empty (required)", "error")
+            elif stage == "COMPLETE":
+                if map_photo == 'None' or not map_photo:
+                    push(
+                        "COMPLETE but map photo is missing",
+                        "error",
+                    )
+                if site_photo == 'None' or not site_photo:
+                    push(
+                        "COMPLETE but site photo is missing",
+                        "warning",
+                    )
 
         return errors_out
 
@@ -441,11 +470,6 @@ class GISCloudWeeklyExporter:
             print("No maps matched keywords:", ", ".join(self.keywords))
             return
 
-        # print("\nAvailable Maps:")
-        # for i, map_data in enumerate(maps, 1):
-        #     print(f"{i}. {map_data.get('name', 'Unnamed Map')} (ID: {map_data.get('id')})")
-
-        # selected = input("\nEnter map numbers (comma separated) or 'all': ").strip()
         selected = "all"
         if selected.lower() == "all":
             selected_maps = maps
@@ -476,12 +500,6 @@ class GISCloudWeeklyExporter:
 
                 layer_name = layer.get("name", f"Layer_{layer_id}")
                 dataset_label = f"{map_name} — {layer_name}"
-
-                # Keep these commented selection lines as requested:
-                # print(f"\nMap: {map_name} (ID: {map_id})")
-                # for i, lyr in enumerate(layers, 1):
-                #     print(f"{i}. {lyr.get('name', 'Unnamed Layer')} (ID: {lyr.get('id')})")
-                # choice = input("Enter layer number(s) (comma separated) or 'all': ").strip()
 
                 print(f"Downloading: {dataset_label} (layer_id={layer_id})")
 
@@ -524,10 +542,9 @@ class GISCloudWeeklyExporter:
                 entry = self.write_main_csv(map_name, layer_name, str(layer_id), rows_all)
                 file_entries.append(entry)
 
-                # Photo validation errors: you have a choice.
-                # Option A (recommended): validate only the selected window to keep the errors list focused.
+                # Photo validation errors: validate only the selected window to keep the errors list focused.
                 rows_window = [r for r in rows_all if self.in_week(r.get("date_of_status_update", ""), start, end)]
-                photo_error_rows.extend(self.validate_photos_rows(rows_window, dataset_label, layer_name))
+                photo_error_rows.extend(self.validate_photos_rows(rows_all, dataset_label, str(layer_id), start, end))
 
         # write photo errors CSV (even if empty, write it so UI has a stable path)
         photo_errors_file, photo_err_count = self.write_photo_errors_csv(start, end, photo_error_rows)
