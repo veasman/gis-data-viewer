@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-02-02T16:03:22",
+  "generated_at": "2026-02-03T04:34:38",
   "week_window": {
     "start": "2026-01-26",
     "end": "2026-01-31"
@@ -17,7 +17,7 @@
       "file": "normalized/ATMOS KS__Master ATMOS KS 2023.csv",
       "map_name": "ATMOS KS",
       "layer_name": "Master ATMOS KS 2023",
-      "row_count": 14347,
+      "row_count": 13000,
       "min_date": "2003-05-04",
       "max_date": "2039-05-06"
     },
@@ -25,7 +25,7 @@
       "file": "normalized/ATMOS CO__Master ATMOS CO 2023.csv",
       "map_name": "ATMOS CO",
       "layer_name": "Master ATMOS CO 2023",
-      "row_count": 9238,
+      "row_count": 9240,
       "min_date": "1993-10-03",
       "max_date": "2026-02-02"
     },
