@@ -1,8 +1,8 @@
 {
-  "generated_at": "2026-02-07T04:32:40",
+  "generated_at": "2026-02-08T04:46:30",
   "week_window": {
-    "start": "2026-01-26",
-    "end": "2026-01-31"
+    "start": "2026-02-02",
+    "end": "2026-02-07"
   },
   "files": [
     {
@@ -27,7 +27,7 @@
       "layer_name": "Master ATMOS CO 2023",
       "row_count": 9335,
       "min_date": "1993-10-03",
-      "max_date": "2026-02-06"
+      "max_date": "2026-02-07"
     },
     {
       "file": "normalized/One Gas__One Gas 2024.csv",
@@ -62,5 +62,5 @@
       "max_date": "2025-09-24"
     }
   ],
-  "photo_errors_file": "errors/photo_errors_2026-01-26_to_2026-01-31.csv"
+  "photo_errors_file": "errors/photo_errors_2026-02-02_to_2026-02-07.csv"
 }
