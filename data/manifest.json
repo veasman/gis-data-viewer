@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-02-20T04:34:36",
+  "generated_at": "2026-02-21T04:31:59",
   "week_window": {
     "start": "2026-02-09",
     "end": "2026-02-14"
@@ -17,7 +17,7 @@
       "file": "normalized/ATMOS KS__Master ATMOS KS 2023.csv",
       "map_name": "ATMOS KS",
       "layer_name": "Master ATMOS KS 2023",
-      "row_count": 14577,
+      "row_count": 14590,
       "min_date": "2003-05-04",
       "max_date": "2039-05-06"
     },
@@ -25,9 +25,9 @@
       "file": "normalized/ATMOS CO__Master ATMOS CO 2023.csv",
       "map_name": "ATMOS CO",
       "layer_name": "Master ATMOS CO 2023",
-      "row_count": 9445,
+      "row_count": 9455,
       "min_date": "1993-10-03",
-      "max_date": "2026-02-19"
+      "max_date": "2026-02-20"
     },
     {
       "file": "normalized/One Gas__One Gas 2024.csv",
@@ -35,7 +35,7 @@
       "layer_name": "One Gas 2024",
       "row_count": 1307,
       "min_date": "2024-04-29",
-      "max_date": "2026-02-19"
+      "max_date": "2026-02-20"
     },
     {
       "file": "normalized/One Gas__One Gas Line Master 2025.csv",
