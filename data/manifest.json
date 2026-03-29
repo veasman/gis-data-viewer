@@ -1,8 +1,8 @@
 {
-  "generated_at": "2026-03-28T04:38:14",
+  "generated_at": "2026-03-29T04:50:13",
   "week_window": {
-    "start": "2026-03-16",
-    "end": "2026-03-21"
+    "start": "2026-03-23",
+    "end": "2026-03-28"
   },
   "files": [
     {
@@ -17,7 +17,7 @@
       "file": "normalized/ATMOS KS__Master ATMOS KS 2023.csv",
       "map_name": "ATMOS KS",
       "layer_name": "Master ATMOS KS 2023",
-      "row_count": 15000,
+      "row_count": 15085,
       "min_date": "2003-05-04",
       "max_date": "2039-05-06"
     },
@@ -62,5 +62,5 @@
       "max_date": "2025-09-24"
     }
   ],
-  "photo_errors_file": "errors/photo_errors_2026-03-16_to_2026-03-21.csv"
+  "photo_errors_file": "errors/photo_errors_2026-03-23_to_2026-03-28.csv"
 }
